@@ -13,6 +13,8 @@ vi.mock("@/lib/chat", async (importOriginal) => ({
 
 const template = readFileSync(path.join(__dirname, "../../../templates/Mutual-NDA.md"), "utf8");
 const mockSendChat = vi.mocked(sendChat);
+const party = (company: string) => ({ company, name: "Ann", title: "CEO", notice: "ann@example.com" });
+const completeFields = { governingLaw: "Delaware", jurisdiction: "New Castle, DE", party1: party("Acme Inc"), party2: party("Globex LLC") };
 const greeting = { reply: "Hi! What is the purpose of the NDA?", fields: {} };
 
 const setup = async () => {
@@ -109,7 +111,7 @@ describe("NdaApp chat", () => {
 
   it("downloads the filled markdown as Mutual-NDA.md", async () => {
     const { user } = await setup();
-    mockSendChat.mockResolvedValueOnce({ reply: "ok", fields: { governingLaw: "Delaware" } });
+    mockSendChat.mockResolvedValueOnce({ reply: "ok", fields: completeFields });
     await user.type(screen.getByLabelText("Message"), "go");
     await user.click(screen.getByRole("button", { name: "Send" }));
     await screen.findByText("ok");
@@ -134,9 +136,35 @@ describe("NdaApp chat", () => {
 
   it("opens the print dialog from the Print button", async () => {
     const { user } = await setup();
+    mockSendChat.mockResolvedValueOnce({ reply: "ok", fields: completeFields });
+    await user.type(screen.getByLabelText("Message"), "go");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    await screen.findByText("ok");
     const print = vi.spyOn(window, "print").mockImplementation(() => {});
     await user.click(screen.getByRole("button", { name: /Print/ }));
     expect(print).toHaveBeenCalledOnce();
+  });
+
+  it("disables download and print and lists what is missing until the form is complete", async () => {
+    const { user } = await setup();
+    const download = screen.getByRole("button", { name: /Download/ });
+    const print = screen.getByRole("button", { name: /Print/ });
+    expect(download).toBeDisabled();
+    expect(print).toBeDisabled();
+    expect(screen.getByText(/Still needed before you can download/)).toHaveTextContent("Governing law, Jurisdiction, Party 1 company");
+    mockSendChat.mockResolvedValueOnce({ reply: "ok", fields: { ...completeFields, party2: { name: "Ann", title: "CEO", notice: "ann@example.com" } } });
+    await user.type(screen.getByLabelText("Message"), "go");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    await screen.findByText("ok");
+    expect(download).toBeDisabled();
+    expect(screen.getByText(/Still needed/)).toHaveTextContent("Party 2 company");
+    mockSendChat.mockResolvedValueOnce({ reply: "done", fields: { party2: { company: "Globex LLC" } } });
+    await user.type(screen.getByLabelText("Message"), "Globex");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    await screen.findByText("done");
+    expect(download).toBeEnabled();
+    expect(print).toBeEnabled();
+    expect(screen.queryByText(/Still needed/)).toBeNull();
   });
 
   it("credits Common Paper under CC BY 4.0", async () => {

@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
-import { openApp, say } from "./helpers";
+import { completeReply, openApp, say } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
   page.on("pageerror", (e) => { throw e; });
@@ -86,7 +86,7 @@ test("malicious input renders as plain text", async ({ page }) => {
 });
 
 test("downloads a Markdown file with the filled-in agreement", async ({ page }) => {
-  await openApp(page, [{ reply: "ok", fields: { governingLaw: "New York" } }]);
+  await openApp(page, [completeReply({ governingLaw: "New York" })]);
   await say(page, "New York");
   await expect(page.getByRole("article")).toContainText("laws of the State of New York");
   const [download] = await Promise.all([
@@ -130,4 +130,24 @@ test("layout works at phone width without horizontal scroll", async ({ page }) =
   expect(overflow).toBeLessThanOrEqual(0);
   await expect(page.getByLabel("Message")).toBeVisible();
   await expect(page.getByRole("article")).toBeVisible();
+});
+
+test("download and print stay disabled until every required detail is filled", async ({ page }) => {
+  await openApp(page, [
+    { reply: "Partly.", fields: { governingLaw: "Delaware" } },
+    completeReply(),
+  ]);
+  const download = page.getByRole("button", { name: /Download/ });
+  const print = page.getByRole("button", { name: /Print/ });
+  await expect(download).toBeDisabled();
+  await expect(print).toBeDisabled();
+  await say(page, "Delaware");
+  await expect(page.getByText("Partly.")).toBeVisible();
+  await expect(download).toBeDisabled();
+  await expect(page.getByText(/Still needed/)).toContainText("Jurisdiction");
+  await expect(page.getByText(/Still needed/)).not.toContainText("Governing law");
+  await say(page, "the rest");
+  await expect(download).toBeEnabled();
+  await expect(print).toBeEnabled();
+  await expect(page.getByText(/Still needed/)).toHaveCount(0);
 });

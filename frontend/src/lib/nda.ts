@@ -189,3 +189,18 @@ export function buildStandardTerms(template: string, f: NdaForm): string {
 export function buildDocument(template: string, f: NdaForm): string {
   return `${buildCoverPage(f)}\n\n---\n\n${buildStandardTerms(template, f)}\n`;
 }
+
+/** Labels of the required details still blank; Modifications is optional. */
+export function missingFields(f: NdaForm): string[] {
+  const missing: string[] = [];
+  if (!f.purpose.trim()) missing.push("Purpose");
+  if (!f.governingLaw.trim()) missing.push("Governing law");
+  if (!f.jurisdiction.trim()) missing.push("Jurisdiction");
+  for (const [label, p] of [["Party 1", f.party1], ["Party 2", f.party2]] as const) {
+    if (!p.company.trim()) missing.push(`${label} company`);
+    if (!p.name.trim()) missing.push(`${label} signatory name`);
+    if (!p.title.trim()) missing.push(`${label} title`);
+    if (!p.notice.trim()) missing.push(`${label} notice address`);
+  }
+  return missing;
+}

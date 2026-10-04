@@ -31,3 +31,11 @@ export async function say(page: Page, text: string) {
   await page.getByLabel("Message").fill(text);
   await page.getByRole("button", { name: "Send" }).click();
 }
+
+const party = (company: string) => ({ company, name: "Ann", title: "CEO", notice: "ann@example.com" });
+
+/** Reply that fills every required detail. */
+export const completeReply = (extra: Record<string, unknown> = {}): MockReply => ({
+  reply: "All set.",
+  fields: { governingLaw: "Delaware", jurisdiction: "New Castle, DE", party1: party("Acme Inc"), party2: party("Globex LLC"), ...extra },
+});

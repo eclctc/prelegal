@@ -9,6 +9,7 @@ import {
   defaultForm,
   formatDate,
   localISODate,
+  missingFields,
   termText,
   type NdaForm,
 } from "@/lib/nda";
@@ -333,5 +334,25 @@ describe("buildDocument", () => {
       party2: { name: "B", title: "T", company: "C", notice: "N" },
     });
     expect(buildDocument(template, full)).not.toContain("[__________]");
+  });
+});
+
+describe("missingFields", () => {
+  it("lists every blank required detail and ignores optional modifications", () => {
+    expect(missingFields(defaultForm())).toEqual([
+      "Governing law", "Jurisdiction",
+      "Party 1 company", "Party 1 signatory name", "Party 1 title", "Party 1 notice address",
+      "Party 2 company", "Party 2 signatory name", "Party 2 title", "Party 2 notice address",
+    ]);
+  });
+
+  it("is empty once everything required is filled, even whitespace-only counts as blank", () => {
+    const form = defaultForm();
+    form.governingLaw = "Delaware";
+    form.jurisdiction = "  ";
+    for (const p of [form.party1, form.party2]) Object.assign(p, { company: "A", name: "B", title: "C", notice: "D" });
+    expect(missingFields(form)).toEqual(["Jurisdiction"]);
+    form.jurisdiction = "New Castle, DE";
+    expect(missingFields(form)).toEqual([]);
   });
 });

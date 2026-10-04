@@ -5,7 +5,7 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import ChatPanel from "@/components/ChatPanel";
 import { type ChatMessage, mergeFields, OPENING_MESSAGE, sendChat } from "@/lib/chat";
-import { buildDocument, defaultForm, localISODate, type NdaForm } from "@/lib/nda";
+import { buildDocument, defaultForm, localISODate, missingFields, type NdaForm } from "@/lib/nda";
 
 export default function NdaApp({ standardTerms }: { standardTerms: string }) {
   const [form, setForm] = useState<NdaForm>(() => defaultForm());
@@ -49,6 +49,7 @@ export default function NdaApp({ standardTerms }: { standardTerms: string }) {
     void askAi(visible);
   };
 
+  const missing = useMemo(() => missingFields(form), [form]);
   const markdown = useMemo(() => buildDocument(standardTerms, form), [standardTerms, form]);
 
   const download = () => {
@@ -73,13 +74,18 @@ export default function NdaApp({ standardTerms }: { standardTerms: string }) {
       </aside>
 
       <main className="p-4 lg:h-screen lg:overflow-y-auto lg:p-8 print:block print:h-auto print:overflow-visible print:p-0">
-        <div className="mx-auto mb-4 flex max-w-3xl justify-end gap-2 print:hidden">
-          <button onClick={download} className="rounded-md bg-[#753991] px-4 py-2 text-sm font-medium text-white hover:opacity-90">
-            Download (.md)
-          </button>
-          <button onClick={() => window.print()} className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-100">
-            Print / Save as PDF
-          </button>
+        <div className="mx-auto mb-4 max-w-3xl space-y-2 print:hidden">
+          <div className="flex justify-end gap-2">
+            <button onClick={download} disabled={missing.length > 0} className="rounded-md bg-[#753991] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40">
+              Download (.md)
+            </button>
+            <button onClick={() => window.print()} disabled={missing.length > 0} className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40">
+              Print / Save as PDF
+            </button>
+          </div>
+          {missing.length > 0 && (
+            <p className="text-right text-xs text-[#888888]">Still needed before you can download: {missing.join(", ")}.</p>
+          )}
         </div>
         <article aria-label="Agreement preview" className="nda mx-auto max-w-3xl rounded-lg bg-white p-5 shadow-sm sm:p-10 print:max-w-none print:shadow-none">
           <Markdown remarkPlugins={[remarkGfm]}>{markdown}</Markdown>
