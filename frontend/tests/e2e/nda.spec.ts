@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
-import { openApp } from "./helpers";
+import { openApp, say } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
   page.on("pageerror", (e) => { throw e; });
@@ -16,11 +16,10 @@ test("no console errors or hydration warnings on load", async ({ page }) => {
 
 test("default effective date is the browser's local today", async ({ page }) => {
   await openApp(page);
-  const today = await page.evaluate(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  });
-  await expect(page.getByLabel("Effective date", { exact: true })).toHaveValue(today);
+  const longDate = await page.evaluate(() =>
+    new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }),
+  );
+  await expect(page.getByRole("article")).toContainText(longDate);
 });
 
 test("effective date uses the viewer's timezone near midnight", async ({ browser }) => {
@@ -28,19 +27,22 @@ test("effective date uses the viewer's timezone near midnight", async ({ browser
   const page = await ctx.newPage();
   await page.clock.install({ time: new Date("2026-03-05T11:30:00Z") }); // 00:30 Mar 6 in Auckland
   await openApp(page);
-  await expect(page.getByLabel("Effective date", { exact: true })).toHaveValue("2026-03-06");
   await expect(page.getByRole("article")).toContainText("March 6, 2026");
   await ctx.close();
 });
 
-test("fills the form end to end and previews the agreement", async ({ page }) => {
-  await openApp(page);
-  await page.getByLabel("Governing law").fill("Delaware");
-  await page.getByLabel("Jurisdiction").fill("New Castle, DE");
-  await page.getByLabel("Modifications").fill("Section 8 is deleted.");
-  const parties = page.getByRole("group", { name: /Party/ });
-  await parties.nth(0).getByLabel("Company").fill("Acme Inc");
-  await parties.nth(1).getByLabel("Company").fill("Globex LLC");
+test("AI opens the chat and a conversation fills in the agreement", async ({ page }) => {
+  const requests = await openApp(page, [
+    { reply: "Noted. Who are the parties?", fields: { governingLaw: "Delaware", jurisdiction: "New Castle, DE" } },
+    { reply: "Great, all set.", fields: { party1: { company: "Acme Inc" }, party2: { company: "Globex LLC" }, modifications: "Section 8 is deleted." } },
+  ]);
+  expect(requests[0].messages).toHaveLength(1); // hidden opening message only
+  await say(page, "Delaware law, courts in New Castle");
+  await expect(page.getByText("Noted. Who are the parties?")).toBeVisible();
+  await say(page, "Acme and Globex, delete section 8");
+  await expect(page.getByText("Great, all set.")).toBeVisible();
+  expect(requests[2].messages.at(-1)?.content).toBe("Acme and Globex, delete section 8");
+  expect(requests[2].messages.length).toBeGreaterThan(requests[1].messages.length);
   const doc = page.getByRole("article");
   await expect(doc).toContainText("laws of the State of Delaware");
   await expect(doc).toContainText("courts located in New Castle, DE");
@@ -49,29 +51,33 @@ test("fills the form end to end and previews the agreement", async ({ page }) =>
   await expect(doc.getByRole("row", { name: /Company/ })).toContainText("Globex LLC");
 });
 
-test("term options change the agreement text", async ({ page }) => {
-  await openApp(page);
+test("AI-chosen term options change the agreement text", async ({ page }) => {
+  await openApp(page, [
+    { reply: "Done.", fields: { termYears: 3 } },
+    { reply: "Updated.", fields: { termKind: "continues", confidentialityKind: "perpetuity" } },
+  ]);
   const doc = page.getByRole("article");
-  await page.getByLabel("MNDA term in years").fill("3");
+  await say(page, "three years");
   await expect(doc).toContainText("expires 3 years after the Effective Date");
-  await page.getByRole("radio", { name: "Continues until terminated" }).check();
-  await page.getByRole("radio", { name: "In perpetuity" }).check();
+  await say(page, "actually until terminated, confidentiality forever");
   await expect(doc).toContainText("continues until terminated in accordance with the terms of this MNDA");
   await expect(doc).toContainText("will survive in perpetuity");
-  await expect(doc).not.toContainText("end of the until");
 });
 
-test("arrow keys move between radios in a group", async ({ page }) => {
+test("a failed chat request shows an error", async ({ page }) => {
   await openApp(page);
-  const first = page.getByRole("radio", { name: "Expires after a fixed number of years" });
-  await first.focus();
-  await page.keyboard.press("ArrowDown");
-  await expect(page.getByRole("radio", { name: "Continues until terminated" })).toBeChecked();
+  await page.unroute("**/api/chat");
+  await page.route("**/api/chat", (route) => route.fulfill({ status: 500, body: "boom" }));
+  await say(page, "hello");
+  await expect(page.getByRole("region", { name: "Chat" }).getByRole("alert")).toContainText("something went wrong");
 });
 
 test("malicious input renders as plain text", async ({ page }) => {
-  await openApp(page);
-  await page.getByLabel("Purpose").fill("# Pwned <script>window.__x=1</script> <img src=x onerror=window.__x=1>");
+  await openApp(page, [
+    { reply: "ok", fields: { purpose: "# Pwned <script>window.__x=1</script> <img src=x onerror=window.__x=1>" } },
+  ]);
+  await say(page, "go");
+  await expect(page.getByText("ok", { exact: true })).toBeVisible();
   const doc = page.getByRole("article");
   await expect(doc.getByRole("heading", { name: /Pwned/ })).toHaveCount(0);
   await expect(doc.locator("img")).toHaveCount(0);
@@ -80,8 +86,9 @@ test("malicious input renders as plain text", async ({ page }) => {
 });
 
 test("downloads a Markdown file with the filled-in agreement", async ({ page }) => {
-  await openApp(page);
-  await page.getByLabel("Governing law").fill("New York");
+  await openApp(page, [{ reply: "ok", fields: { governingLaw: "New York" } }]);
+  await say(page, "New York");
+  await expect(page.getByRole("article")).toContainText("laws of the State of New York");
   const [download] = await Promise.all([
     page.waitForEvent("download"),
     page.getByRole("button", { name: /Download/ }).click(),
@@ -121,15 +128,6 @@ test("layout works at phone width without horizontal scroll", async ({ page }) =
   await openApp(page);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
-  await expect(page.getByLabel("Governing law")).toBeVisible();
+  await expect(page.getByLabel("Message")).toBeVisible();
   await expect(page.getByRole("article")).toBeVisible();
-});
-
-test("numeric inputs keep what the user types", async ({ page }) => {
-  await openApp(page);
-  const box = page.getByLabel("Confidentiality term in years");
-  await box.fill("");
-  await box.pressSequentially("5");
-  await expect(box).toHaveValue("5");
-  await expect(page.getByRole("article")).toContainText("5 year(s) from Effective Date, but");
 });

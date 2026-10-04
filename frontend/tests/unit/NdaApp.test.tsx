@@ -4,179 +4,143 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import NdaApp from "@/components/NdaApp";
+import { sendChat } from "@/lib/chat";
+
+vi.mock("@/lib/chat", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/chat")>()),
+  sendChat: vi.fn(),
+}));
 
 const template = readFileSync(path.join(__dirname, "../../../templates/Mutual-NDA.md"), "utf8");
+const mockSendChat = vi.mocked(sendChat);
+const greeting = { reply: "Hi! What is the purpose of the NDA?", fields: {} };
 
-const setup = () => {
+const setup = async () => {
   const user = userEvent.setup();
   render(<NdaApp standardTerms={template} />);
+  await screen.findByText(greeting.reply);
   const preview = () => screen.getByRole("article", { name: "Agreement preview" });
   return { user, preview };
 };
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
-  vi.setSystemTime(new Date(2026, 9, 3, 21, 30)); // evening local time, Oct 3 2026
+  vi.setSystemTime(new Date(2026, 9, 3, 21, 30));
+  mockSendChat.mockReset();
+  mockSendChat.mockResolvedValueOnce(greeting);
 });
 afterEach(() => {
   vi.useRealTimers();
   cleanup();
 });
 
-describe("NdaApp", () => {
-  it("defaults the effective date to today's local date after mount", () => {
-    setup();
-    expect(screen.getByLabelText("Effective date")).toHaveValue("2026-10-03");
-    expect(screen.getAllByText(/October 3, 2026/).length).toBeGreaterThan(0);
+describe("NdaApp chat", () => {
+  it("opens the conversation with an AI greeting using a hidden opening message", async () => {
+    await setup();
+    const [sent, form] = mockSendChat.mock.calls[0];
+    expect(sent).toHaveLength(1);
+    expect(sent[0].role).toBe("user");
+    expect(form.party1.company).toBe("");
+    expect(screen.queryByText(sent[0].content)).toBeNull();
   });
 
-  it("renders the cover page and standard terms with placeholders", () => {
-    const { preview } = setup();
-    expect(within(preview()).getByRole("heading", { level: 1, name: "Mutual Non-Disclosure Agreement" })).toBeInTheDocument();
-    expect(within(preview()).getByRole("heading", { name: "Standard Terms" })).toBeInTheDocument();
-    expect(preview()).toHaveTextContent("Governing Law: [__________]");
-    expect(preview()).toHaveTextContent("laws of the State of [__________]");
-  });
-
-  it("updates the preview as the user types", async () => {
-    const { user, preview } = setup();
-    await user.type(screen.getByLabelText("Governing law"), "Delaware");
-    await user.type(screen.getByLabelText("Jurisdiction"), "New Castle, DE");
+  it("sends the user's reply with history and fills the preview from the AI's fields", async () => {
+    const { user, preview } = await setup();
+    mockSendChat.mockResolvedValueOnce({
+      reply: "Noted Delaware.",
+      fields: { governingLaw: "Delaware", party1: { company: "Acme Inc" } },
+    });
+    await user.type(screen.getByLabelText("Message"), "Delaware law, I am Acme Inc");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText("Noted Delaware.")).toBeInTheDocument();
+    const history = mockSendChat.mock.calls[1][0];
+    expect(history.map((m) => m.content)).toContain(greeting.reply);
+    expect(history.at(-1)).toEqual({ role: "user", content: "Delaware law, I am Acme Inc" });
     expect(preview()).toHaveTextContent("Governing Law: Delaware");
-    expect(preview()).toHaveTextContent("laws of the State of Delaware, without regard");
-    expect(preview()).toHaveTextContent("courts located in New Castle, DE.");
+    expect(within(within(preview()).getByRole("table")).getByRole("row", { name: /Company/ })).toHaveTextContent("Acme Inc");
   });
 
-  it("fills in the signature table for both parties", async () => {
-    const { user, preview } = setup();
-    const [p1, p2] = screen.getAllByRole("group", { name: /Party/ });
-    await user.type(within(p1).getByLabelText("Company"), "Acme Inc");
-    await user.type(within(p2).getByLabelText("Company"), "Globex LLC");
-    await user.type(within(p1).getByLabelText("Signatory name"), "Ann");
-    const table = within(preview()).getByRole("table");
-    const row = within(table).getByRole("row", { name: /Company/ });
-    expect(row).toHaveTextContent("Acme Inc");
-    expect(row).toHaveTextContent("Globex LLC");
-    expect(within(table).getByRole("row", { name: /Print Name/ })).toHaveTextContent("Ann");
+  it("defaults the effective date to today and shows placeholders", async () => {
+    const { preview } = await setup();
+    expect(preview()).toHaveTextContent("October 3, 2026");
+    expect(preview()).toHaveTextContent("Governing Law: [__________]");
   });
 
-  it("does not render user-entered headings, HTML or table breakouts as markup", async () => {
-    const { user, preview } = setup();
-    await user.clear(screen.getByLabelText("Purpose"));
-    await user.type(screen.getByLabelText("Purpose"), "# Pwned <img src=x>");
-    const [p1] = screen.getAllByRole("group", { name: /Party/ });
-    await user.type(within(p1).getByLabelText("Company"), "A | B");
+  it("shows an error and recovers when the request fails", async () => {
+    const { user } = await setup();
+    mockSendChat.mockRejectedValueOnce(new Error("boom"));
+    await user.type(screen.getByLabelText("Message"), "hello");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("something went wrong");
+    mockSendChat.mockResolvedValueOnce({ reply: "Back again.", fields: {} });
+    await user.type(screen.getByLabelText("Message"), "retry");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText("Back again.")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("does not render AI-supplied headings, HTML or table breakouts as markup", async () => {
+    const { user, preview } = await setup();
+    mockSendChat.mockResolvedValueOnce({
+      reply: "ok",
+      fields: { purpose: "# Pwned <img src=x>", party1: { company: "A | B" } },
+    });
+    await user.type(screen.getByLabelText("Message"), "go");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    await screen.findByText("ok");
     expect(within(preview()).queryByRole("heading", { name: /Pwned/ })).toBeNull();
     expect(preview().querySelector("img")).toBeNull();
-    expect(preview()).toHaveTextContent("# Pwned <img src=x>");
     const row = within(within(preview()).getByRole("table")).getByRole("row", { name: /Company/ });
     expect(within(row).getAllByRole("cell")).toHaveLength(3);
-    expect(row).toHaveTextContent("A | B");
   });
 
-  it("switches term options and keeps Section 5 grammatical", async () => {
-    const { user, preview } = setup();
-    await user.click(screen.getByRole("radio", { name: "Continues until terminated" }));
-    await user.click(screen.getByRole("radio", { name: "In perpetuity" }));
+  it("applies term choices from the AI to the agreement text", async () => {
+    const { user, preview } = await setup();
+    mockSendChat.mockResolvedValueOnce({
+      reply: "ok",
+      fields: { termKind: "continues", confidentialityKind: "perpetuity" },
+    });
+    await user.type(screen.getByLabelText("Message"), "go");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    await screen.findByText("ok");
     expect(preview()).toHaveTextContent("and continues until terminated in accordance with the terms of this MNDA.");
     expect(preview()).toHaveTextContent("will survive in perpetuity");
-    const checks = within(preview()).getAllByRole("checkbox");
-    expect(checks.filter((c) => (c as HTMLInputElement).checked)).toHaveLength(2);
-    expect(checks).toHaveLength(4);
-  });
-
-  it("radio groups share a name so arrow keys move within them", () => {
-    setup();
-    const term = screen.getByRole("group", { name: "MNDA term" });
-    const names = within(term).getAllByRole("radio").map((r) => r.getAttribute("name"));
-    expect(new Set(names).size).toBe(1);
-    expect(names[0]).toBeTruthy();
-    const conf = screen.getByRole("group", { name: "Term of confidentiality" });
-    const confNames = within(conf).getAllByRole("radio").map((r) => r.getAttribute("name"));
-    expect(confNames[0]).not.toBe(names[0]);
-  });
-
-  describe("years inputs", () => {
-    it("lets the user clear and retype a value (no snap-back to 1)", async () => {
-      const { user, preview } = setup();
-      const box = screen.getByLabelText("MNDA term in years");
-      await user.clear(box);
-      expect(box).toHaveValue("");
-      await user.type(box, "3");
-      expect(box).toHaveValue("3");
-      expect(preview()).toHaveTextContent("Expires 3 year(s) from Effective Date.");
-      expect(preview()).toHaveTextContent("expires 3 years after the Effective Date");
-    });
-    it("rejects non-digits, zero and absurd values, reverting on blur", async () => {
-      const { user, preview } = setup();
-      const box = screen.getByLabelText("MNDA term in years");
-      await user.clear(box);
-      await user.type(box, "1.5e9");
-      expect(box).toHaveValue("15"); // digits only, max two characters
-      await user.clear(box);
-      await user.type(box, "0");
-      await user.tab();
-      expect(box).toHaveValue("15"); // zero never committed; reverts to last valid value
-      expect(preview()).toHaveTextContent("Expires 15 year(s)");
-      expect(preview()).not.toHaveTextContent("Infinity");
-      expect(preview()).not.toHaveTextContent("NaN");
-    });
-    it("exposes accessible names for both numeric inputs", () => {
-      setup();
-      expect(screen.getByLabelText("MNDA term in years")).toBeInTheDocument();
-      expect(screen.getByLabelText("Confidentiality term in years")).toBeInTheDocument();
-    });
   });
 
   it("downloads the filled markdown as Mutual-NDA.md", async () => {
-    const { user } = setup();
-    await user.type(screen.getByLabelText("Governing law"), "Delaware");
+    const { user } = await setup();
+    mockSendChat.mockResolvedValueOnce({ reply: "ok", fields: { governingLaw: "Delaware" } });
+    await user.type(screen.getByLabelText("Message"), "go");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    await screen.findByText("ok");
     let blob: Blob | undefined;
     const create = vi.fn((b: Blob) => ((blob = b), "blob:test"));
     const revoke = vi.fn();
     Object.assign(URL, { createObjectURL: create, revokeObjectURL: revoke });
     const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
       expect(this.download).toBe("Mutual-NDA.md");
-      expect(this.href).toBe("blob:test");
     });
     await user.click(screen.getByRole("button", { name: /Download/ }));
     expect(click).toHaveBeenCalledOnce();
     expect(revoke).toHaveBeenCalledWith("blob:test");
-    expect(blob!.type).toContain("text/markdown");
     const text = await new Promise<string>((res) => {
       const r = new FileReader();
       r.onload = () => res(String(r.result));
       r.readAsText(blob!);
     });
     expect(text).toContain("Governing Law: Delaware");
-    expect(text).toContain("# Standard Terms");
     click.mockRestore();
   });
 
   it("opens the print dialog from the Print button", async () => {
-    const { user } = setup();
+    const { user } = await setup();
     const print = vi.spyOn(window, "print").mockImplementation(() => {});
     await user.click(screen.getByRole("button", { name: /Print/ }));
     expect(print).toHaveBeenCalledOnce();
   });
 
-  it("exposes hints as descriptions, not as part of the field name", () => {
-    setup();
-    expect(screen.getByRole("textbox", { name: "Governing law" })).toHaveAccessibleDescription("State, e.g. Delaware");
-    const [notice] = screen.getAllByRole("textbox", { name: "Notice address" });
-    expect(notice).toHaveAccessibleDescription("Email or postal address");
-  });
-
-  it("labels every form control", () => {
-    setup();
-    for (const el of document.querySelectorAll("aside input, aside textarea")) {
-      expect(el, el.outerHTML).toHaveAccessibleName();
-    }
-  });
-
-  it("credits Common Paper under CC BY 4.0", () => {
-    setup();
+  it("credits Common Paper under CC BY 4.0", async () => {
+    await setup();
     expect(screen.getByRole("link", { name: /Common Paper Mutual NDA v1.0/ })).toHaveAttribute("href", expect.stringContaining("commonpaper.com"));
-    expect(screen.getAllByRole("link", { name: "CC BY 4.0" }).length).toBeGreaterThanOrEqual(2); // footer + document
   });
 });

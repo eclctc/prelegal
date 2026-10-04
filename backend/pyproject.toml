@@ -5,6 +5,8 @@ description = "Prelegal FastAPI backend"
 requires-python = ">=3.14"
 dependencies = [
     "fastapi>=0.142.2",
+    "litellm>=1.104.0",
+    "pydantic>=2.13.5",
     "uvicorn[standard]>=0.54.0",
 ]
 
