@@ -1,30 +1,43 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
-import LoginScreen from "./LoginScreen";
+import { createContext, useContext, useEffect, useState } from "react";
+import AuthScreen from "./AuthScreen";
+import { getMe, signOut as signOutRequest } from "@/lib/api";
 
-export const SESSION_KEY = "prelegal-signed-in";
-
-const listeners = new Set<() => void>();
-
-function subscribe(listener: () => void) {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
+interface Session {
+  email: string;
+  signOut: () => Promise<void>;
 }
 
-function signIn() {
-  sessionStorage.setItem(SESSION_KEY, "true");
-  listeners.forEach((listener) => listener());
+const SessionContext = createContext<Session | null>(null);
+
+/** The signed-in user and sign-out action; only valid inside AuthGate's children. */
+export function useSession(): Session {
+  const session = useContext(SessionContext);
+  if (!session) throw new Error("useSession must be used inside AuthGate");
+  return session;
 }
 
-/** Shows the login screen until the user signs in; the flag lives in sessionStorage. */
+type State = { status: "loading" } | { status: "signedOut" } | { status: "signedIn"; email: string };
+
+/** Shows the sign in / sign up screen until the server confirms a session cookie. */
 export default function AuthGate({ children }: { children: React.ReactNode }) {
-  const signedIn = useSyncExternalStore(
-    subscribe,
-    () => sessionStorage.getItem(SESSION_KEY) === "true",
-    () => null,
-  );
+  const [state, setState] = useState<State>({ status: "loading" });
 
-  if (signedIn === null) return null;
-  return signedIn ? <>{children}</> : <LoginScreen onLogin={signIn} />;
+  useEffect(() => {
+    getMe().then(
+      ({ email }) => setState({ status: "signedIn", email }),
+      () => setState({ status: "signedOut" }),
+    );
+  }, []);
+
+  if (state.status === "loading") return null;
+  if (state.status === "signedOut") {
+    return <AuthScreen onAuthenticated={(email) => setState({ status: "signedIn", email })} />;
+  }
+  const signOut = async () => {
+    await signOutRequest();
+    setState({ status: "signedOut" });
+  };
+  return <SessionContext value={{ email: state.email, signOut }}>{children}</SessionContext>;
 }

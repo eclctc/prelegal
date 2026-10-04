@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import DraftApp from "@/components/DraftApp";
 import type { DocumentSpec } from "@/lib/documents";
+import { createDocument, updateDocument } from "@/lib/api";
 import { sendChat } from "@/lib/chat";
 
 vi.mock("@/lib/chat", async (importOriginal) => ({
@@ -14,10 +15,14 @@ vi.mock("@/lib/chat", async (importOriginal) => ({
 
 const root = path.join(__dirname, "../../..");
 const documents: DocumentSpec[] = JSON.parse(readFileSync(path.join(root, "documents.json"), "utf8"));
+vi.mock("@/lib/api", () => ({ createDocument: vi.fn(), updateDocument: vi.fn() }));
+
 const templates = Object.fromEntries(
   documents.map((d) => [d.id, readFileSync(path.join(root, "templates", d.template), "utf8")]),
 );
 const mockSendChat = vi.mocked(sendChat);
+const mockCreate = vi.mocked(createDocument);
+const mockUpdate = vi.mocked(updateDocument);
 const party = (company: string) => ({ company, name: "Ann", title: "CEO", notice: "ann@example.com" });
 const completeFields = { governingLaw: "Delaware", jurisdiction: "New Castle, DE", party1: party("Acme Inc"), party2: party("Globex LLC") };
 const greeting = { documentType: "mutual-nda", reply: "Hi! What is the purpose of the NDA?", fields: {} };
@@ -35,6 +40,8 @@ beforeEach(() => {
   vi.setSystemTime(new Date(2026, 9, 3, 21, 30));
   mockSendChat.mockReset();
   mockSendChat.mockResolvedValueOnce(greeting);
+  mockCreate.mockReset().mockResolvedValue({ id: 7 });
+  mockUpdate.mockReset().mockResolvedValue({ id: 7 });
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -234,5 +241,66 @@ describe("DraftApp document selection", () => {
     expect(mockSendChat.mock.calls[2][1]).toBe("pilot");
     expect(mockSendChat.mock.calls[2][2]).toMatchObject({ Customer: "Globex" });
     expect(screen.getByRole("button", { name: "Download (.md)" })).toBeEnabled();
+  });
+});
+
+describe("DraftApp autosave and resume", () => {
+  it("creates the saved record after the first turn then updates it", async () => {
+    const user = userEvent.setup();
+    render(<DraftApp documents={documents} templates={templates} />);
+    await screen.findByText(greeting.reply);
+    await vi.waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({ documentType: "mutual-nda" });
+    mockSendChat.mockResolvedValueOnce({ documentType: "mutual-nda", reply: "Noted.", fields: { governingLaw: "Delaware" } });
+    await user.type(screen.getByLabelText("Message"), "Delaware");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    await screen.findByText("Noted.");
+    await vi.waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+    const [id, body] = mockUpdate.mock.calls[0];
+    expect(id).toBe(7);
+    expect(body.messages.at(-1)).toEqual({ role: "assistant", content: "Noted." });
+    expect(body.fields).toMatchObject({ governingLaw: "Delaware" });
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not save before a document has been chosen", async () => {
+    mockSendChat.mockReset().mockResolvedValueOnce({ documentType: null, reply: "What do you need?", fields: {} });
+    render(<DraftApp documents={documents} templates={templates} />);
+    await screen.findByText("What do you need?");
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it("restores a saved document, skips the greeting and does not re-save until the user continues", async () => {
+    const initial = {
+      id: 3,
+      documentType: "pilot",
+      fields: { Customer: "Globex" },
+      messages: [
+        { role: "user" as const, content: "a pilot" },
+        { role: "assistant" as const, content: "Who is the Provider?" },
+      ],
+      updatedAt: "2026-10-04 15:00:00.000",
+    };
+    mockSendChat.mockReset();
+    const user = userEvent.setup();
+    render(<DraftApp documents={documents} templates={templates} initial={initial} />);
+    expect(screen.getByText("Who is the Provider?")).toBeInTheDocument();
+    expect(screen.getAllByText("Globex").length).toBeGreaterThan(0);
+    expect(mockSendChat).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
+
+    mockSendChat.mockResolvedValueOnce({ documentType: "pilot", reply: "Thanks.", fields: { Provider: "Acme" } });
+    await user.type(screen.getByLabelText("Message"), "Acme");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    await screen.findByText("Thanks.");
+    expect(mockSendChat.mock.calls[0][1]).toBe("pilot");
+    await vi.waitFor(() => expect(mockUpdate).toHaveBeenCalledWith(3, expect.objectContaining({ fields: { Customer: "Globex", Provider: "Acme" } })));
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it("puts the draft disclaimer at the top of the agreement", async () => {
+    render(<DraftApp documents={documents} templates={templates} />);
+    await screen.findByText(greeting.reply);
+    expect(screen.getByRole("article", { name: "Agreement preview" })).toHaveTextContent(/Draft for review.*subject to review by a qualified attorney/);
   });
 });

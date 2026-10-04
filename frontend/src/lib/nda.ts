@@ -1,3 +1,5 @@
+import { DISCLAIMER } from "@/lib/disclaimer";
+
 export type TermKind = "expires" | "continues";
 export type ConfidentialityKind = "years" | "perpetuity";
 
@@ -102,6 +104,8 @@ export function buildCoverPage(f: NdaForm): string {
   const y = (n: number) => `${n} year(s)`;
 
   return `# Mutual Non-Disclosure Agreement
+
+${DISCLAIMER}
 
 ## USING THIS MUTUAL NON-DISCLOSURE AGREEMENT
 

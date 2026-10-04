@@ -1,3 +1,4 @@
+import { DISCLAIMER } from "@/lib/disclaimer";
 import { clean } from "@/lib/nda";
 
 export interface FieldSpec {
@@ -54,5 +55,17 @@ export function buildGenericDocument(spec: DocumentSpec, template: string, value
     })
     .replace(HEADER_SPAN, "**$1**")
     .replace(OTHER_SPAN, "");
-  return `# ${spec.name}\n\n## Key Terms\n\n| Term | Value |\n|:--- |:--- |\n${rows}\n\n---\n\n${body}\n`;
+  return `# ${spec.name}\n\n${DISCLAIMER}\n\n## Key Terms\n\n| Term | Value |\n|:--- |:--- |\n${rows}\n\n---\n\n${body}\n`;
+}
+
+const PARTY_KEYS = ["Customer", "Provider", "Partner", "Company"];
+
+/** Short description of who a saved document is between, e.g. "Acme Inc / Globex LLC". */
+export function documentParties(documentType: string, savedFields: object): string {
+  const fields = savedFields as Record<string, unknown>;
+  const names =
+    documentType === NDA_ID
+      ? ["party1", "party2"].map((p) => (fields[p] as { company?: string } | undefined)?.company)
+      : PARTY_KEYS.map((k) => fields[k]);
+  return names.filter((n): n is string => typeof n === "string" && n.trim() !== "").slice(0, 2).join(" / ");
 }
