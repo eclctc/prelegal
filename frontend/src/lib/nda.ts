@@ -71,7 +71,7 @@ const escLine = (v: string) =>
     .replace(/^([#>+-])/, "\\$1")
     .replace(/^(\d+)([.)])/, "$1\\$2");
 /** Single-line escaped text (newlines collapsed), or the blank placeholder when empty. */
-const clean = (v: string) => escLine(v.replace(/\s*\n\s*/g, " ")) || blank;
+export const clean = (v: string) => escLine(v.replace(/\s*\n\s*/g, " ")) || blank;
 /** Multi-line escaped text keeping each line as its own paragraph. */
 const cleanBlock = (v: string) =>
   v.split(/\r?\n/).map(escLine).filter(Boolean).join("\n\n") || blank;

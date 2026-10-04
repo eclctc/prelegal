@@ -13,10 +13,15 @@ interface ChatPanelProps {
 export default function ChatPanel({ messages, pending, error, onSend }: ChatPanelProps) {
   const [text, setText] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView?.({ block: "end" });
   }, [messages, pending]);
+
+  useEffect(() => {
+    if (!pending) inputRef.current?.focus();
+  }, [pending]);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,6 +52,7 @@ export default function ChatPanel({ messages, pending, error, onSend }: ChatPane
       </div>
       <form onSubmit={submit} className="flex gap-2 border-t border-slate-200 pt-3">
         <input
+          ref={inputRef}
           aria-label="Message"
           className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
           value={text}

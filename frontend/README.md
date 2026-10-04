@@ -9,7 +9,7 @@ npm run dev          # http://localhost:3000
 ```
 
 The standard terms are read from `../templates/Mutual-NDA.md` on the server. If `frontend/` is deployed
-without the repo root, set `TEMPLATES_DIR` to the folder containing the templates.
+without the repo root, set `REPO_ROOT` to the folder containing `documents.json` and `templates/`.
 
 ## Tests
 
