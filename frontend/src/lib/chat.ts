@@ -10,15 +10,17 @@ export type FieldsUpdate = {
   [K in keyof NdaForm]?: (NdaForm[K] extends PartyInfo ? PartyUpdate : NdaForm[K]) | null;
 };
 
+/** `fields` is an NdaForm-shaped update for the Mutual NDA and a term-to-value map otherwise. */
 export interface ChatReply {
   reply: string;
-  fields: FieldsUpdate;
+  documentType: string | null;
+  fields: FieldsUpdate | Record<string, string | null>;
 }
 
 /** Sent as the hidden first user turn so the AI opens the conversation. */
 export const OPENING_MESSAGE: ChatMessage = {
   role: "user",
-  content: "Hello, I need a Mutual NDA.",
+  content: "Hello, I would like to draft a legal document.",
 };
 
 /** Drops null, undefined and blank-string entries so an unsure model cannot wipe filled fields. */
@@ -39,11 +41,20 @@ export function mergeFields(form: NdaForm, update: FieldsUpdate): NdaForm {
   };
 }
 
-export async function sendChat(messages: ChatMessage[], form: NdaForm): Promise<ChatReply> {
+/** Apply the values the AI extracted this turn to a generic document's term-to-value map. */
+export function mergeValues(values: Record<string, string>, update: Record<string, string | null>) {
+  return { ...values, ...(provided(update) as Record<string, string>) };
+}
+
+export async function sendChat(
+  messages: ChatMessage[],
+  documentType: string | null,
+  fields: object,
+): Promise<ChatReply> {
   const response = await fetch("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages, fields: form }),
+    body: JSON.stringify({ messages, documentType, fields }),
   });
   if (!response.ok) throw new Error(`Chat request failed (${response.status})`);
   return response.json();

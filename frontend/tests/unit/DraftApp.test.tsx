@@ -3,7 +3,8 @@ import path from "node:path";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import NdaApp from "@/components/NdaApp";
+import DraftApp from "@/components/DraftApp";
+import type { DocumentSpec } from "@/lib/documents";
 import { sendChat } from "@/lib/chat";
 
 vi.mock("@/lib/chat", async (importOriginal) => ({
@@ -11,15 +12,19 @@ vi.mock("@/lib/chat", async (importOriginal) => ({
   sendChat: vi.fn(),
 }));
 
-const template = readFileSync(path.join(__dirname, "../../../templates/Mutual-NDA.md"), "utf8");
+const root = path.join(__dirname, "../../..");
+const documents: DocumentSpec[] = JSON.parse(readFileSync(path.join(root, "documents.json"), "utf8"));
+const templates = Object.fromEntries(
+  documents.map((d) => [d.id, readFileSync(path.join(root, "templates", d.template), "utf8")]),
+);
 const mockSendChat = vi.mocked(sendChat);
 const party = (company: string) => ({ company, name: "Ann", title: "CEO", notice: "ann@example.com" });
 const completeFields = { governingLaw: "Delaware", jurisdiction: "New Castle, DE", party1: party("Acme Inc"), party2: party("Globex LLC") };
-const greeting = { reply: "Hi! What is the purpose of the NDA?", fields: {} };
+const greeting = { documentType: "mutual-nda", reply: "Hi! What is the purpose of the NDA?", fields: {} };
 
 const setup = async () => {
   const user = userEvent.setup();
-  render(<NdaApp standardTerms={template} />);
+  render(<DraftApp documents={documents} templates={templates} />);
   await screen.findByText(greeting.reply);
   const preview = () => screen.getByRole("article", { name: "Agreement preview" });
   return { user, preview };
@@ -36,19 +41,20 @@ afterEach(() => {
   cleanup();
 });
 
-describe("NdaApp chat", () => {
+describe("DraftApp chat (Mutual NDA)", () => {
   it("opens the conversation with an AI greeting using a hidden opening message", async () => {
     await setup();
-    const [sent, form] = mockSendChat.mock.calls[0];
+    const [sent, documentType, fields] = mockSendChat.mock.calls[0];
     expect(sent).toHaveLength(1);
     expect(sent[0].role).toBe("user");
-    expect(form.party1.company).toBe("");
+    expect(documentType).toBeNull();
+    expect(fields).toEqual({});
     expect(screen.queryByText(sent[0].content)).toBeNull();
   });
 
   it("returns focus to the message input after the AI replies to a button click", async () => {
     const { user } = await setup();
-    mockSendChat.mockResolvedValueOnce({ reply: "Noted.", fields: {} });
+    mockSendChat.mockResolvedValueOnce({ documentType: "mutual-nda", reply: "Noted.", fields: {} });
     await user.type(screen.getByLabelText("Message"), "hello");
     await user.click(screen.getByRole("button", { name: "Send" }));
     await screen.findByText("Noted.");
@@ -58,7 +64,7 @@ describe("NdaApp chat", () => {
   it("sends the user's reply with history and fills the preview from the AI's fields", async () => {
     const { user, preview } = await setup();
     mockSendChat.mockResolvedValueOnce({
-      reply: "Noted Delaware.",
+      documentType: "mutual-nda", reply: "Noted Delaware.",
       fields: { governingLaw: "Delaware", party1: { company: "Acme Inc" } },
     });
     await user.type(screen.getByLabelText("Message"), "Delaware law, I am Acme Inc");
@@ -83,7 +89,7 @@ describe("NdaApp chat", () => {
     await user.type(screen.getByLabelText("Message"), "hello");
     await user.click(screen.getByRole("button", { name: "Send" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("something went wrong");
-    mockSendChat.mockResolvedValueOnce({ reply: "Back again.", fields: {} });
+    mockSendChat.mockResolvedValueOnce({ documentType: "mutual-nda", reply: "Back again.", fields: {} });
     await user.type(screen.getByLabelText("Message"), "retry");
     await user.click(screen.getByRole("button", { name: "Send" }));
     expect(await screen.findByText("Back again.")).toBeInTheDocument();
@@ -93,7 +99,7 @@ describe("NdaApp chat", () => {
   it("does not render AI-supplied headings, HTML or table breakouts as markup", async () => {
     const { user, preview } = await setup();
     mockSendChat.mockResolvedValueOnce({
-      reply: "ok",
+      documentType: "mutual-nda", reply: "ok",
       fields: { purpose: "# Pwned <img src=x>", party1: { company: "A | B" } },
     });
     await user.type(screen.getByLabelText("Message"), "go");
@@ -108,7 +114,7 @@ describe("NdaApp chat", () => {
   it("applies term choices from the AI to the agreement text", async () => {
     const { user, preview } = await setup();
     mockSendChat.mockResolvedValueOnce({
-      reply: "ok",
+      documentType: "mutual-nda", reply: "ok",
       fields: { termKind: "continues", confidentialityKind: "perpetuity" },
     });
     await user.type(screen.getByLabelText("Message"), "go");
@@ -120,7 +126,7 @@ describe("NdaApp chat", () => {
 
   it("downloads the filled markdown as Mutual-NDA.md", async () => {
     const { user } = await setup();
-    mockSendChat.mockResolvedValueOnce({ reply: "ok", fields: completeFields });
+    mockSendChat.mockResolvedValueOnce({ documentType: "mutual-nda", reply: "ok", fields: completeFields });
     await user.type(screen.getByLabelText("Message"), "go");
     await user.click(screen.getByRole("button", { name: "Send" }));
     await screen.findByText("ok");
@@ -145,7 +151,7 @@ describe("NdaApp chat", () => {
 
   it("opens the print dialog from the Print button", async () => {
     const { user } = await setup();
-    mockSendChat.mockResolvedValueOnce({ reply: "ok", fields: completeFields });
+    mockSendChat.mockResolvedValueOnce({ documentType: "mutual-nda", reply: "ok", fields: completeFields });
     await user.type(screen.getByLabelText("Message"), "go");
     await user.click(screen.getByRole("button", { name: "Send" }));
     await screen.findByText("ok");
@@ -161,13 +167,13 @@ describe("NdaApp chat", () => {
     expect(download).toBeDisabled();
     expect(print).toBeDisabled();
     expect(screen.getByText(/Still needed before you can download/)).toHaveTextContent("Governing law, Jurisdiction, Party 1 company");
-    mockSendChat.mockResolvedValueOnce({ reply: "ok", fields: { ...completeFields, party2: { name: "Ann", title: "CEO", notice: "ann@example.com" } } });
+    mockSendChat.mockResolvedValueOnce({ documentType: "mutual-nda", reply: "ok", fields: { ...completeFields, party2: { name: "Ann", title: "CEO", notice: "ann@example.com" } } });
     await user.type(screen.getByLabelText("Message"), "go");
     await user.click(screen.getByRole("button", { name: "Send" }));
     await screen.findByText("ok");
     expect(download).toBeDisabled();
     expect(screen.getByText(/Still needed/)).toHaveTextContent("Party 2 company");
-    mockSendChat.mockResolvedValueOnce({ reply: "done", fields: { party2: { company: "Globex LLC" } } });
+    mockSendChat.mockResolvedValueOnce({ documentType: "mutual-nda", reply: "done", fields: { party2: { company: "Globex LLC" } } });
     await user.type(screen.getByLabelText("Message"), "Globex");
     await user.click(screen.getByRole("button", { name: "Send" }));
     await screen.findByText("done");
@@ -178,6 +184,55 @@ describe("NdaApp chat", () => {
 
   it("credits Common Paper under CC BY 4.0", async () => {
     await setup();
-    expect(screen.getByRole("link", { name: /Common Paper Mutual NDA v1.0/ })).toHaveAttribute("href", expect.stringContaining("commonpaper.com"));
+    expect(screen.getByRole("link", { name: "Common Paper" })).toHaveAttribute("href", expect.stringContaining("commonpaper.com"));
+  });
+});
+
+describe("DraftApp document selection", () => {
+  const openSelection = async () => {
+    mockSendChat.mockReset();
+    mockSendChat.mockResolvedValueOnce({ documentType: null, reply: "What would you like to draft?", fields: {} });
+    const user = userEvent.setup();
+    render(<DraftApp documents={documents} templates={templates} />);
+    await screen.findByText("What would you like to draft?");
+    return user;
+  };
+  const say = async (user: ReturnType<typeof userEvent.setup>, text: string) => {
+    await user.type(screen.getByLabelText("Message"), text);
+    await user.click(screen.getByRole("button", { name: "Send" }));
+  };
+
+  it("shows no agreement and disables download until a document is chosen", async () => {
+    await openSelection();
+    expect(screen.getByText(/appear here once you have chosen a document/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Download (.md)" })).toBeDisabled();
+  });
+
+  it("keeps selection open when the AI offers an alternative to an unsupported document", async () => {
+    const user = await openSelection();
+    mockSendChat.mockResolvedValueOnce({ documentType: null, reply: "No leases; try a Pilot Agreement?", fields: {} });
+    await say(user, "a lease");
+    await screen.findByText("No leases; try a Pilot Agreement?");
+    expect(mockSendChat.mock.calls[1][1]).toBeNull();
+    expect(screen.getByRole("heading", { name: "Legal documents" })).toBeInTheDocument();
+  });
+
+  it("switches to the chosen document, fills its key terms and enables download when complete", async () => {
+    const user = await openSelection();
+    const pilot = documents.find((d) => d.id === "pilot")!;
+    const all = Object.fromEntries(pilot.fields.map((f) => [f.key, `v-${f.key}`]));
+    mockSendChat.mockResolvedValueOnce({ documentType: "pilot", reply: "Who is the Customer?", fields: { Customer: "Globex" } });
+    await say(user, "a pilot");
+    await screen.findByText("Who is the Customer?");
+    expect(screen.getAllByRole("heading", { name: "Pilot Agreement" })).toHaveLength(2);
+    expect(screen.getAllByText("Globex").length).toBeGreaterThan(1);
+    expect(screen.getByRole("button", { name: "Download (.md)" })).toBeDisabled();
+
+    mockSendChat.mockResolvedValueOnce({ documentType: "pilot", reply: "All set.", fields: all });
+    await say(user, "everything");
+    await screen.findByText("All set.");
+    expect(mockSendChat.mock.calls[2][1]).toBe("pilot");
+    expect(mockSendChat.mock.calls[2][2]).toMatchObject({ Customer: "Globex" });
+    expect(screen.getByRole("button", { name: "Download (.md)" })).toBeEnabled();
   });
 });

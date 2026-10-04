@@ -4,11 +4,26 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import ChatPanel from "@/components/ChatPanel";
-import { type ChatMessage, mergeFields, OPENING_MESSAGE, sendChat } from "@/lib/chat";
+import {
+  type ChatMessage,
+  type FieldsUpdate,
+  mergeFields,
+  mergeValues,
+  OPENING_MESSAGE,
+  sendChat,
+} from "@/lib/chat";
+import { buildGenericDocument, type DocumentSpec, missingGeneric, NDA_ID, type Values } from "@/lib/documents";
 import { buildDocument, defaultForm, localISODate, missingFields, type NdaForm } from "@/lib/nda";
 
-export default function NdaApp({ standardTerms }: { standardTerms: string }) {
+interface DraftAppProps {
+  documents: DocumentSpec[];
+  templates: Record<string, string>;
+}
+
+export default function DraftApp({ documents, templates }: DraftAppProps) {
+  const [documentId, setDocumentId] = useState<string | null>(null);
   const [form, setForm] = useState<NdaForm>(() => defaultForm());
+  const [values, setValues] = useState<Values>({});
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,8 +41,10 @@ export default function NdaApp({ standardTerms }: { standardTerms: string }) {
     setPending(true);
     setError(null);
     try {
-      const result = await sendChat([OPENING_MESSAGE, ...visible], form);
-      setForm((f) => mergeFields(f, result.fields));
+      const result = await sendChat([OPENING_MESSAGE, ...visible], documentId, documentId === NDA_ID ? form : values);
+      if (result.documentType) setDocumentId(result.documentType);
+      if (result.documentType === NDA_ID) setForm((f) => mergeFields(f, result.fields as FieldsUpdate));
+      else if (result.documentType) setValues((v) => mergeValues(v, result.fields as Record<string, string | null>));
       setMessages([...visible, { role: "assistant", content: result.reply }]);
     } catch {
       setError("Sorry, something went wrong. Please try again.");
@@ -49,14 +66,24 @@ export default function NdaApp({ standardTerms }: { standardTerms: string }) {
     void askAi(visible);
   };
 
-  const missing = useMemo(() => missingFields(form), [form]);
-  const markdown = useMemo(() => buildDocument(standardTerms, form), [standardTerms, form]);
+  const spec = documents.find((d) => d.id === documentId);
+  const { markdown, missing } = useMemo(() => {
+    if (!spec) return { markdown: null, missing: ["a document"] };
+    if (spec.id === NDA_ID) {
+      return { markdown: buildDocument(templates[spec.id], form), missing: missingFields(form) };
+    }
+    return {
+      markdown: buildGenericDocument(spec, templates[spec.id], values),
+      missing: missingGeneric(spec, values),
+    };
+  }, [spec, templates, form, values]);
 
   const download = () => {
+    if (!spec || !markdown) return;
     const url = URL.createObjectURL(new Blob([markdown], { type: "text/markdown;charset=utf-8" }));
     const a = document.createElement("a");
     a.href = url;
-    a.download = "Mutual-NDA.md";
+    a.download = spec.template;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -65,7 +92,7 @@ export default function NdaApp({ standardTerms }: { standardTerms: string }) {
     <div className="min-h-screen bg-slate-50 lg:grid lg:grid-cols-[26rem_1fr] print:block print:bg-white">
       <aside className="flex h-[32rem] flex-col gap-4 border-r border-slate-200 bg-white p-6 print:hidden lg:h-screen">
         <div>
-          <h1 className="text-xl font-semibold text-[#032147]">Mutual NDA</h1>
+          <h1 className="text-xl font-semibold text-[#032147]">{spec?.name ?? "Legal documents"}</h1>
           <p className="text-sm text-[#888888]">Chat with the assistant; the agreement fills in as you talk.</p>
         </div>
         <div className="min-h-0 flex-1">
@@ -88,11 +115,15 @@ export default function NdaApp({ standardTerms }: { standardTerms: string }) {
           )}
         </div>
         <article aria-label="Agreement preview" className="nda mx-auto max-w-3xl rounded-lg bg-white p-5 shadow-sm sm:p-10 print:max-w-none print:shadow-none">
-          <Markdown remarkPlugins={[remarkGfm]}>{markdown}</Markdown>
+          {markdown ? (
+            <Markdown remarkPlugins={[remarkGfm]}>{markdown}</Markdown>
+          ) : (
+            <p className="text-[#888888]">Your agreement will appear here once you have chosen a document.</p>
+          )}
         </article>
         <footer className="mx-auto mt-4 max-w-3xl text-xs text-slate-500 print:hidden">
           Agreement text from{" "}
-          <a className="underline" href="https://commonpaper.com/standards/mutual-nda/1.0/">Common Paper Mutual NDA v1.0</a>
+          <a className="underline" href="https://commonpaper.com/standards/">Common Paper</a>
           , licensed under{" "}
           <a className="underline" href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>. Filled in with your details.
         </footer>
