@@ -46,6 +46,15 @@ describe("NdaApp chat", () => {
     expect(screen.queryByText(sent[0].content)).toBeNull();
   });
 
+  it("returns focus to the message input after the AI replies to a button click", async () => {
+    const { user } = await setup();
+    mockSendChat.mockResolvedValueOnce({ reply: "Noted.", fields: {} });
+    await user.type(screen.getByLabelText("Message"), "hello");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    await screen.findByText("Noted.");
+    expect(screen.getByLabelText("Message")).toHaveFocus();
+  });
+
   it("sends the user's reply with history and fills the preview from the AI's fields", async () => {
     const { user, preview } = await setup();
     mockSendChat.mockResolvedValueOnce({
