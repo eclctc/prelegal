@@ -31,7 +31,8 @@ export class ApiError extends Error {
   }
 }
 
-export const getMe = () => request<{ email: string }>("GET", "/api/auth/me");
+/** The signed-in email, or null when there is no session. */
+export const getMe = () => request<{ email: string | null }>("GET", "/api/auth/me");
 export const signUp = (email: string, password: string) =>
   request<{ email: string }>("POST", "/api/auth/signup", { email, password });
 export const signIn = (email: string, password: string) =>

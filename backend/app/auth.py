@@ -43,15 +43,20 @@ def delete_session(connection: sqlite3.Connection, token: str) -> None:
     connection.execute("DELETE FROM sessions WHERE token_hash = ?", (_token_hash(token),))
 
 
+def find_user(connection: sqlite3.Connection, session: str | None) -> sqlite3.Row | None:
+    """The user a session cookie belongs to, or None."""
+    if not session:
+        return None
+    return connection.execute(
+        "SELECT users.id, users.email FROM sessions JOIN users ON users.id = sessions.user_id "
+        "WHERE sessions.token_hash = ?",
+        (_token_hash(session),),
+    ).fetchone()
+
+
 def current_user(connection: Connection, session: Annotated[str | None, Cookie()] = None) -> sqlite3.Row:
     """Dependency: the signed-in user, or 401."""
-    row = None
-    if session:
-        row = connection.execute(
-            "SELECT users.id, users.email FROM sessions JOIN users ON users.id = sessions.user_id "
-            "WHERE sessions.token_hash = ?",
-            (_token_hash(session),),
-        ).fetchone()
+    row = find_user(connection, session)
     if row is None:
         raise HTTPException(status_code=401, detail="Not signed in")
     return row

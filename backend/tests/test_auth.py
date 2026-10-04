@@ -40,7 +40,7 @@ def test_weak_or_malformed_credentials_are_rejected(client):
 def test_login_with_correct_password_works_from_a_new_browser(client):
     client.post("/api/auth/signup", json=CREDENTIALS)
     other_browser = TestClient(client.app)  # no context manager: the lifespan would reset the DB
-    assert other_browser.get("/api/auth/me").status_code == 401
+    assert other_browser.get("/api/auth/me").json() == {"email": None}
     assert other_browser.post("/api/auth/login", json=CREDENTIALS).status_code == 200
     assert other_browser.get("/api/auth/me").status_code == 200
 
@@ -55,9 +55,9 @@ def test_login_failure_does_not_reveal_which_part_was_wrong(client):
 
 def test_logout_ends_the_session(signed_in_client):
     assert signed_in_client.post("/api/auth/logout").status_code == 204
-    assert signed_in_client.get("/api/auth/me").status_code == 401
+    assert signed_in_client.get("/api/auth/me").json() == {"email": None}
 
 
-def test_me_and_chat_require_a_session(client):
-    assert client.get("/api/auth/me").status_code == 401
+def test_me_reports_no_user_without_an_error_and_chat_requires_a_session(client):
+    assert client.get("/api/auth/me").json() == {"email": None}
     assert client.post("/api/chat", json={"messages": [], "fields": {}}).status_code == 401

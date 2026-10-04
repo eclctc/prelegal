@@ -24,7 +24,7 @@ const renderGate = () =>
   );
 
 beforeEach(() => {
-  vi.mocked(getMe).mockRejectedValue(new ApiError(401, "Not signed in"));
+  vi.mocked(getMe).mockResolvedValue({ email: null });
   vi.mocked(signOut).mockResolvedValue();
 });
 afterEach(() => {

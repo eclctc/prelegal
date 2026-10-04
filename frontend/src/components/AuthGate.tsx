@@ -26,7 +26,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     getMe().then(
-      ({ email }) => setState({ status: "signedIn", email }),
+      ({ email }) => setState(email ? { status: "signedIn", email } : { status: "signedOut" }),
       () => setState({ status: "signedOut" }),
     );
   }, []);

@@ -7,7 +7,7 @@ from fastapi import APIRouter, Cookie, HTTPException, Response
 from pydantic import BaseModel, Field
 
 from app import auth
-from app.auth import Connection, CurrentUser
+from app.auth import Connection
 
 router = APIRouter(prefix="/api/auth")
 
@@ -56,5 +56,7 @@ def logout(response: Response, connection: Connection, session: Annotated[str | 
 
 
 @router.get("/me")
-def me(user: CurrentUser) -> dict:
-    return {"email": user["email"]}
+def me(connection: Connection, session: Annotated[str | None, Cookie()] = None) -> dict:
+    """The signed-in email, or null. Returns 200 either way so a signed-out page load is not an error."""
+    user = auth.find_user(connection, session)
+    return {"email": user["email"] if user else None}

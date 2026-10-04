@@ -39,8 +39,12 @@ def reset_database(db_path: Path = DB_PATH) -> None:
 
 
 def get_connection() -> Iterator[sqlite3.Connection]:
-    """FastAPI dependency: one connection per request, committed on success."""
-    connection = sqlite3.connect(DB_PATH)
+    """FastAPI dependency: one connection per request, committed on success.
+
+    FastAPI may set up the dependency and run the endpoint on different threadpool threads; the
+    connection is only ever used by one request at a time, so the thread check is disabled.
+    """
+    connection = sqlite3.connect(DB_PATH, check_same_thread=False)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
     try:
