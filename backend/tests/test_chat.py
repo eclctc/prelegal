@@ -153,6 +153,12 @@ def test_nda_reply_without_a_question_gets_one_naming_the_first_missing_field(mo
     assert post_chat(monkeypatch, tmp_path, [content], body).json()["reply"] == "Noted. What is the jurisdiction?"
 
 
+def test_nda_follow_up_uses_readable_party_labels(monkeypatch, tmp_path):
+    content = {"reply": "Noted.", "fields": {"purpose": "x", "governingLaw": "TX", "jurisdiction": "Austin, TX"}}
+    body = {"messages": [{"role": "user", "content": "x"}], "documentType": "mutual-nda", "fields": {}}
+    assert post_chat(monkeypatch, tmp_path, [content], body).json()["reply"] == "Noted. What is the party 1 company name?"
+
+
 def test_complete_documents_and_real_questions_are_left_alone(monkeypatch, tmp_path):
     full = {f["key"]: "x" for f in documents.DOCUMENTS["pilot"]["fields"]}
     done = post_chat(monkeypatch, tmp_path, [{"reply": "All set.", "fields": {}}], {"messages": [], "documentType": "pilot", "fields": full})

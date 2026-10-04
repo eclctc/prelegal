@@ -34,20 +34,18 @@ def missing_required(document_id: str, values: dict) -> list[str]:
     ]
 
 
-NDA_REQUIRED = ["purpose", "governingLaw", "jurisdiction"]
-NDA_PARTY_REQUIRED = ["company", "name", "title", "notice"]
+NDA_REQUIRED = {"purpose": "purpose", "governingLaw": "governing law", "jurisdiction": "jurisdiction"}
+NDA_PARTY_REQUIRED = {"company": "company name", "name": "signatory name", "title": "signatory title", "notice": "notice address"}
 
 
 def nda_missing_required(values: dict) -> list[str]:
-    """Required Mutual NDA field labels with no value; party fields are dotted, e.g. party1.company."""
-    parties = [f"{p}.{k}" for p in ("party1", "party2") for k in NDA_PARTY_REQUIRED]
-    missing = []
-    for key in NDA_REQUIRED + parties:
-        value = values
-        for part in key.split("."):
-            value = (value or {}).get(part) if isinstance(value, dict) else None
-        if not str(value or "").strip():
-            missing.append(key)
+    """Human-readable labels of the required Mutual NDA fields that have no value."""
+    missing = [label for key, label in NDA_REQUIRED.items() if not str(values.get(key) or "").strip()]
+    for number in (1, 2):
+        party = values.get(f"party{number}") or {}
+        missing += [
+            f"party {number} {label}" for key, label in NDA_PARTY_REQUIRED.items() if not str(party.get(key) or "").strip()
+        ]
     return missing
 
 
