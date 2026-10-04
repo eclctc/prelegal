@@ -3,7 +3,7 @@ import { PASSWORD, signUp, uniqueEmail } from "./helpers";
 
 test("shows the sign in screen first and hides the app until signed in", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Prelegal" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign out" })).toHaveCount(0);
 });
 

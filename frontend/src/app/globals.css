@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
+  --background: #f1f4f8;
   --foreground: #171717;
 }
 
@@ -19,7 +19,10 @@ body {
 }
 
 /* Agreement typography (no typography plugin installed). */
-.nda { color: #0f172a; line-height: 1.6; font-size: 0.95rem; }
+.nda { color: #0f172a; line-height: 1.65; font-size: 1rem; font-family: var(--font-document), Georgia, serif; }
+.nda h1, .nda h2, .nda h3 { color: #032147; }
+.nda blockquote { margin: 0 0 1.5rem; padding: 0.75rem 1rem; border-left: 4px solid #ecad0a; background: #fdf6e3; font-family: var(--font-geist-sans), sans-serif; font-size: 0.8rem; line-height: 1.5; color: #4a3b0a; }
+.nda blockquote p { margin: 0; }
 .nda h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 1rem; text-align: center; }
 .nda h2 { font-size: 1.2rem; font-weight: 600; margin: 1.5rem 0 0.5rem; }
 .nda h3 { font-size: 1rem; font-weight: 600; margin: 1.25rem 0 0.25rem; }
@@ -29,7 +32,7 @@ body {
 .nda ul { list-style: none; padding-left: 0; margin-bottom: 0.9rem; }
 .nda ul input[type="checkbox"] { margin-right: 0.5rem; }
 .nda ul li { margin-bottom: 0.3rem; }
-.nda a { color: #4338ca; text-decoration: underline; }
+.nda a { color: #1b7ca8; text-decoration: underline; }
 .nda hr { margin: 2rem 0; border-color: #cbd5e1; }
 .nda em { color: #64748b; font-size: 0.85rem; }
 .nda table { width: 100%; table-layout: fixed; border-collapse: collapse; margin: 1rem 0; }
@@ -38,3 +41,6 @@ body {
 @media print { .nda hr { page-break-after: always; border: 0; } }
 
 @page { margin: 1in; }
+
+:focus-visible { outline: 2px solid #209dd7; outline-offset: 2px; }
+@media print { .nda blockquote { background: none; } }

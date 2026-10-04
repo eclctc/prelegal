@@ -151,7 +151,7 @@ export default function DraftApp({ documents, templates, initial }: DraftAppProp
             <p className="text-right text-xs text-[#888888]">Still needed before you can download: {missing.join(", ")}.</p>
           )}
         </div>
-        <article aria-label="Agreement preview" className="nda mx-auto max-w-3xl rounded-lg bg-white p-5 shadow-sm sm:p-10 print:max-w-none print:shadow-none">
+        <article aria-label="Agreement preview" className="nda mx-auto max-w-3xl rounded-sm bg-white p-6 shadow-md ring-1 ring-slate-200 sm:p-14 print:max-w-none print:p-0 print:shadow-none print:ring-0">
           {markdown ? (
             <Markdown remarkPlugins={[remarkGfm]}>{markdown}</Markdown>
           ) : (

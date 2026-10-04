@@ -37,15 +37,28 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (emai
   };
 
   return (
-    <main className="flex flex-1 items-center justify-center bg-slate-50 px-4">
+    <main className="grid flex-1 lg:grid-cols-[1fr_1.1fr]">
+      <section className="flex flex-col justify-center gap-6 bg-[#032147] px-8 py-12 text-white sm:px-14">
+        <p className="text-3xl font-bold tracking-tight">
+          Prelegal<span className="text-[#ecad0a]">.</span>
+        </p>
+        <h2 className="max-w-md text-2xl font-semibold leading-snug sm:text-3xl">
+          Tell the assistant what you need. Get a draft agreement back.
+        </h2>
+        <p className="max-w-md text-white/75">
+          Choose from eleven standard agreements, answer a few plain-language questions, and download the finished
+          draft. Everything you create is kept in My documents.
+        </p>
+      </section>
+      <section className="flex items-center justify-center bg-[#f1f4f8] px-4 py-12">
       <form
         onSubmit={submit}
-        className="w-full max-w-sm space-y-5 rounded-lg border border-slate-200 border-t-4 border-t-[#ecad0a] bg-white p-8 shadow-sm"
+        className="w-full max-w-sm space-y-5 rounded-lg border border-slate-200 bg-white p-8 shadow-sm"
       >
         <div>
-          <h1 className="text-2xl font-bold text-[#032147]">Prelegal</h1>
+          <h1 className="text-2xl font-bold text-[#032147]">{creating ? "Create your account" : "Welcome back"}</h1>
           <p className="mt-1 text-sm text-[#888888]">
-            {creating ? "Create an account to draft and keep your legal agreements." : "Sign in to draft your legal agreements."}
+            {creating ? "Draft and keep your legal agreements in one place." : "Sign in to continue your drafts."}
           </p>
         </div>
         <div className="space-y-1">
@@ -81,6 +94,7 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (emai
           </button>
         </p>
       </form>
+      </section>
     </main>
   );
 }
