@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from app import db
 from app.auth_routes import router as auth_router
 from app.chat_routes import router as chat_router
+from app.documents_routes import router as documents_router
 
 STATIC_DIR = Path(os.environ.get("STATIC_DIR", "static"))
 
@@ -23,6 +24,7 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(title="Prelegal", lifespan=lifespan)
 app.include_router(auth_router)
 app.include_router(chat_router)
+app.include_router(documents_router)
 
 
 @app.get("/api/health")
