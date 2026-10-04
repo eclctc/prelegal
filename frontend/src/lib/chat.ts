@@ -18,7 +18,7 @@ export interface ChatReply {
 /** Sent as the hidden first user turn so the AI opens the conversation. */
 export const OPENING_MESSAGE: ChatMessage = {
   role: "user",
-  content: "Hello, I'd like to draft a Mutual NDA.",
+  content: "Hello, I need a Mutual NDA.",
 };
 
 /** Drops null, undefined and blank-string entries so an unsure model cannot wipe filled fields. */

@@ -10,7 +10,7 @@ MODEL = "openrouter/openai/gpt-oss-120b"
 EXTRA_BODY = {"provider": {"order": ["cerebras"]}}
 
 SYSTEM_PROMPT = """You help a user draft a Mutual Non-Disclosure Agreement (Common Paper) through a friendly chat.
-Ask about the document and its fields a few at a time, in plain language. Fields:
+Ask about the document and its fields one or two at a time, in plain language. Keep replies short. Fields:
 - purpose: how Confidential Information may be used
 - effectiveDate: yyyy-mm-dd
 - termKind: "expires" after termYears years, or "continues" until terminated
@@ -19,7 +19,9 @@ Ask about the document and its fields a few at a time, in plain language. Fields
 - modifications: any changes to the standard terms
 - party1 and party2: name, title, company, notice (email or postal address for notices)
 Each turn, put in `fields` only the values the user gave or confirmed in their latest message; leave everything else null.
-Resolve relative dates such as "next Monday" to yyyy-mm-dd using today's date. Never invent values. In `reply`, acknowledge what you captured and ask for what is still missing.
+Resolve relative dates such as "next Monday" to yyyy-mm-dd using today's date. Never invent values.
+The current field values are form defaults plus anything already captured in this conversation; defaults are not user choices. Only claim to have captured something the user actually said in the conversation.
+If the user has not yet said anything about the document, just greet them briefly and ask what the NDA is for. In `reply`, acknowledge what you captured and ask for what is still missing.
 When the essentials are filled, tell the user the document is ready to download."""
 
 
