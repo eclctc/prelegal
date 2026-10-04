@@ -39,8 +39,8 @@ export default function ChatPanel({ messages, pending, error, onSend }: ChatPane
             key={i}
             className={
               m.role === "user"
-                ? "ml-8 rounded-lg bg-[#209dd7] px-3 py-2 text-sm text-white"
-                : "mr-8 rounded-lg bg-slate-100 px-3 py-2 text-sm text-[#032147]"
+                ? "ml-8 rounded-lg bg-[#209dd7] px-3 py-2 text-sm leading-relaxed text-white"
+                : "mr-8 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm leading-relaxed text-[#032147]"
             }
           >
             {m.content}

@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import AuthGate from "@/components/AuthGate";
-import DraftApp from "@/components/DraftApp";
+import AppShell from "@/components/AppShell";
 import type { DocumentSpec } from "@/lib/documents";
 
 // The Common Paper templates and documents.json live at the repo root and are the single source
@@ -15,7 +15,7 @@ export default async function Home() {
   );
   return (
     <AuthGate>
-      <DraftApp documents={documents} templates={Object.fromEntries(entries)} />
+      <AppShell documents={documents} templates={Object.fromEntries(entries)} />
     </AuthGate>
   );
 }

@@ -20,11 +20,25 @@ export async function mockChat(page: Page, replies: MockReply[] = [], greeting: 
   return requests;
 }
 
-/** Opens the app with a mocked AI and passes the placeholder login screen. */
+export const PASSWORD = "correct horse";
+
+/** Each test registers its own user because the e2e server's database is shared. */
+export const uniqueEmail = () => `user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
+
+/** Creates an account through the UI, which also signs the user in. */
+export async function signUp(page: Page, email = uniqueEmail()) {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Create an account" }).click();
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill(PASSWORD);
+  await page.getByRole("button", { name: "Create account" }).click();
+  return email;
+}
+
+/** Opens the app with a mocked AI as a freshly registered user. */
 export async function openApp(page: Page, replies: MockReply[] = []) {
   const requests = await mockChat(page, replies);
-  await page.goto("/");
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await signUp(page);
   await page.getByText(GREETING.reply).waitFor();
   return requests;
 }

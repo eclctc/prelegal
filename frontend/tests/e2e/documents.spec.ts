@@ -1,11 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { mockChat } from "./helpers";
+import { mockChat, signUp } from "./helpers";
 
 const openSelection = async (page: import("@playwright/test").Page, replies: object[]) => {
   const greeting = { reply: "What would you like to draft?", documentType: null, fields: {} };
   const requests = await mockChat(page, replies as never, greeting);
-  await page.goto("/");
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await signUp(page);
   await page.getByText("What would you like to draft?").waitFor();
   return requests;
 };

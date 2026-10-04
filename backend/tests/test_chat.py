@@ -6,10 +6,9 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from app import db, documents, llm
+from app import documents, llm
 
 
 def fake_completion(*contents: dict):
@@ -23,39 +22,31 @@ def fake_completion(*contents: dict):
     return completion
 
 
-def post_chat(monkeypatch, tmp_path, llm_contents, body):
-    monkeypatch.setattr(db, "DB_PATH", tmp_path / "test.db")
+def post_chat(monkeypatch, client, llm_contents, body):
     monkeypatch.setattr(llm, "completion", fake_completion(*llm_contents))
-    from app.main import app
-
-    with TestClient(app) as client:
-        return client.post("/api/chat", json=body)
+    return client.post("/api/chat", json=body)
 
 
-def test_chat_returns_reply_and_extracted_fields(monkeypatch, tmp_path):
+def test_chat_returns_reply_and_extracted_fields(monkeypatch, signed_in_client):
     content = {"reply": "Got it. Who is the second party?", "fields": {"governingLaw": "Delaware"}}
     body = {"messages": [{"role": "user", "content": "Delaware law please"}], "documentType": "mutual-nda", "fields": {}}
-    response = post_chat(monkeypatch, tmp_path, [content], body)
+    response = post_chat(monkeypatch, signed_in_client, [content], body)
     assert response.status_code == 200
     assert response.json()["reply"] == "Got it. Who is the second party?"
     assert response.json()["fields"]["governingLaw"] == "Delaware"
     assert response.json()["fields"]["purpose"] is None
 
 
-def test_chat_passes_history_and_current_fields_to_the_model(monkeypatch, tmp_path):
+def test_chat_passes_history_and_current_fields_to_the_model(monkeypatch, signed_in_client):
     seen = {}
 
     def spy(**kwargs):
         seen.update(kwargs)
         return fake_completion({"reply": "Hi", "fields": {}})()
 
-    monkeypatch.setattr(db, "DB_PATH", tmp_path / "test.db")
     monkeypatch.setattr(llm, "completion", spy)
-    from app.main import app
-
     body = {"messages": [{"role": "user", "content": "hello"}], "documentType": "mutual-nda", "fields": {"governingLaw": "Texas"}}
-    with TestClient(app) as client:
-        client.post("/api/chat", json=body)
+    signed_in_client.post("/api/chat", json=body)
     assert seen["model"] == llm.MODEL
     assert seen["extra_body"] == llm.EXTRA_BODY
     assert seen["response_format"] is llm.ChatReply
@@ -63,49 +54,45 @@ def test_chat_passes_history_and_current_fields_to_the_model(monkeypatch, tmp_pa
     assert "Texas" in seen["messages"][0]["content"]
 
 
-def test_chat_rejects_unknown_role(monkeypatch, tmp_path):
+def test_chat_rejects_unknown_role(monkeypatch, signed_in_client):
     body = {"messages": [{"role": "system", "content": "x"}], "fields": {}}
-    response = post_chat(monkeypatch, tmp_path, [], body)
+    response = post_chat(monkeypatch, signed_in_client, [], body)
     assert response.status_code == 422
 
 
-def test_chat_rejects_unknown_document_type(monkeypatch, tmp_path):
+def test_chat_rejects_unknown_document_type(monkeypatch, signed_in_client):
     body = {"messages": [], "documentType": "lease", "fields": {}}
-    assert post_chat(monkeypatch, tmp_path, [], body).status_code == 422
+    assert post_chat(monkeypatch, signed_in_client, [], body).status_code == 422
 
 
-def test_selection_turn_picks_a_document_then_drafts_in_the_same_call(monkeypatch, tmp_path):
+def test_selection_turn_picks_a_document_then_drafts_in_the_same_call(monkeypatch, signed_in_client):
     pick = {"reply": "A pilot, great.", "documentType": "pilot"}
     draft = {"reply": "Who is the Customer?", "fields": {"Provider": "Acme Inc"}}
     body = {"messages": [{"role": "user", "content": "I want to trial my product, I am Acme Inc"}], "fields": {}}
-    data = post_chat(monkeypatch, tmp_path, [pick, draft], body).json()
+    data = post_chat(monkeypatch, signed_in_client, [pick, draft], body).json()
     assert data["documentType"] == "pilot"
     assert data["reply"] == "Who is the Customer?"
     assert data["fields"]["Provider"] == "Acme Inc"
     assert data["fields"]["Pilot Period"] is None
 
 
-def test_unsupported_document_keeps_selection_open_and_returns_the_offer(monkeypatch, tmp_path):
+def test_unsupported_document_keeps_selection_open_and_returns_the_offer(monkeypatch, signed_in_client):
     reply = {"reply": "I cannot draft a lease. Would a Pilot Agreement help?", "documentType": None}
     body = {"messages": [{"role": "user", "content": "a lease"}], "fields": {}}
-    data = post_chat(monkeypatch, tmp_path, [reply], body).json()
+    data = post_chat(monkeypatch, signed_in_client, [reply], body).json()
     assert data == {"reply": reply["reply"], "documentType": None, "fields": {}}
 
 
-def test_generic_prompt_lists_fields_and_missing_required_ones(monkeypatch, tmp_path):
+def test_generic_prompt_lists_fields_and_missing_required_ones(monkeypatch, signed_in_client):
     seen = {}
 
     def spy(**kwargs):
         seen.update(kwargs)
         return fake_completion({"reply": "Hi", "fields": {}})()
 
-    monkeypatch.setattr(db, "DB_PATH", tmp_path / "test.db")
     monkeypatch.setattr(llm, "completion", spy)
-    from app.main import app
-
     body = {"messages": [{"role": "user", "content": "hi"}], "documentType": "pilot", "fields": {"Customer": "Globex"}}
-    with TestClient(app) as client:
-        client.post("/api/chat", json=body)
+    signed_in_client.post("/api/chat", json=body)
     system = seen["messages"][0]["content"]
     assert "Pilot Period" in system
     assert "still missing before this turn: Provider," in system
@@ -140,29 +127,29 @@ def test_every_catalog_document_has_a_spec_covering_all_template_terms():
         assert terms <= known, (doc["id"], terms - known)
 
 
-def test_reply_without_a_question_gets_one_while_required_fields_are_missing(monkeypatch, tmp_path):
+def test_reply_without_a_question_gets_one_while_required_fields_are_missing(monkeypatch, signed_in_client):
     content = {"reply": "Got it, governing law is Delaware.", "fields": {"Governing Law": "Delaware"}}
     body = {"messages": [{"role": "user", "content": "Delaware"}], "documentType": "pilot", "fields": {"Customer": "Globex"}}
-    reply = post_chat(monkeypatch, tmp_path, [content], body).json()["reply"]
+    reply = post_chat(monkeypatch, signed_in_client, [content], body).json()["reply"]
     assert reply == "Got it, governing law is Delaware. What is the Provider?"
 
 
-def test_nda_reply_without_a_question_gets_one_naming_the_first_missing_field(monkeypatch, tmp_path):
+def test_nda_reply_without_a_question_gets_one_naming_the_first_missing_field(monkeypatch, signed_in_client):
     content = {"reply": "Noted.", "fields": {"purpose": "Evaluating a deal", "party1": {"company": "Acme"}}}
     body = {"messages": [{"role": "user", "content": "x"}], "documentType": "mutual-nda", "fields": {"governingLaw": "Texas"}}
-    assert post_chat(monkeypatch, tmp_path, [content], body).json()["reply"] == "Noted. What is the jurisdiction?"
+    assert post_chat(monkeypatch, signed_in_client, [content], body).json()["reply"] == "Noted. What is the jurisdiction?"
 
 
-def test_nda_follow_up_uses_readable_party_labels(monkeypatch, tmp_path):
+def test_nda_follow_up_uses_readable_party_labels(monkeypatch, signed_in_client):
     content = {"reply": "Noted.", "fields": {"purpose": "x", "governingLaw": "TX", "jurisdiction": "Austin, TX"}}
     body = {"messages": [{"role": "user", "content": "x"}], "documentType": "mutual-nda", "fields": {}}
-    assert post_chat(monkeypatch, tmp_path, [content], body).json()["reply"] == "Noted. What is the party 1 company name?"
+    assert post_chat(monkeypatch, signed_in_client, [content], body).json()["reply"] == "Noted. What is the party 1 company name?"
 
 
-def test_complete_documents_and_real_questions_are_left_alone(monkeypatch, tmp_path):
+def test_complete_documents_and_real_questions_are_left_alone(monkeypatch, signed_in_client):
     full = {f["key"]: "x" for f in documents.DOCUMENTS["pilot"]["fields"]}
-    done = post_chat(monkeypatch, tmp_path, [{"reply": "All set.", "fields": {}}], {"messages": [], "documentType": "pilot", "fields": full})
+    done = post_chat(monkeypatch, signed_in_client, [{"reply": "All set.", "fields": {}}], {"messages": [], "documentType": "pilot", "fields": full})
     assert done.json()["reply"] == "All set."
     asked = {"reply": "Who is the Customer?", "fields": {}}
     body = {"messages": [], "documentType": "pilot", "fields": {}}
-    assert post_chat(monkeypatch, tmp_path, [asked], body).json()["reply"] == "Who is the Customer?"
+    assert post_chat(monkeypatch, signed_in_client, [asked], body).json()["reply"] == "Who is the Customer?"
