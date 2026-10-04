@@ -2,18 +2,20 @@ import type { Page } from "@playwright/test";
 
 export interface MockReply {
   reply: string;
+  documentType?: string | null;
   fields: Record<string, unknown>;
 }
 
 export const GREETING: MockReply = { reply: "Hi! What is the purpose of the NDA?", fields: {} };
 
 /** Serves /api/chat from a fixed queue of replies (greeting first) and records request bodies. */
-export async function mockChat(page: Page, replies: MockReply[] = []) {
-  const queue = [GREETING, ...replies];
-  const requests: { messages: { role: string; content: string }[]; fields: unknown }[] = [];
+export async function mockChat(page: Page, replies: MockReply[] = [], greeting: MockReply = GREETING) {
+  const queue = [greeting, ...replies];
+  const requests: { messages: { role: string; content: string }[]; documentType: string | null; fields: unknown }[] = [];
   await page.route("**/api/chat", async (route) => {
     requests.push(route.request().postDataJSON());
-    await route.fulfill({ json: queue.shift() ?? { reply: "(no more mock replies)", fields: {} } });
+    const next = queue.shift() ?? { reply: "(no more mock replies)", fields: {} };
+    await route.fulfill({ json: { documentType: "mutual-nda", ...next } });
   });
   return requests;
 }

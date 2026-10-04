@@ -14,7 +14,7 @@ EXTRA_BODY = {"provider": {"order": ["cerebras"]}}
 TURN_RULES = """Each turn, put in `fields` only the values the user gave or confirmed in their latest message; leave everything else null.
 Resolve relative dates such as "next Monday" to a written-out date using today's date. Never invent values.
 The current field values may include form defaults; defaults are not user choices. Only claim to have captured something the user actually said in the conversation.
-In `reply`, briefly acknowledge what you captured. If any required field is still missing, you MUST end the reply with a question asking for the next missing field(s); never end without a question while information is missing.
+In `reply`, briefly acknowledge what you captured. If any required field is still missing, you MUST end the reply with a direct question (a sentence ending in "?") asking for the next missing field(s). A statement such as "I still need X" is not enough; ask "What is X?" instead.
 When all required fields are filled, tell the user the document is ready to download."""
 
 NDA_PROMPT = f"""You help a user draft a Mutual Non-Disclosure Agreement (Common Paper) through a friendly chat.
@@ -29,6 +29,8 @@ Ask about the document and its fields one or two at a time, in plain language. K
 Required: purpose, governingLaw, jurisdiction and every party1 and party2 value.
 {TURN_RULES}
 Use yyyy-mm-dd for effectiveDate. If the user has said nothing about the NDA yet, greet them briefly and ask what it is for."""
+
+FINAL_REMINDER = "Reminder: unless every required field is now filled, your `reply` must finish with a question mark question about the next missing field."
 
 GENERIC_PROMPT = """You help a user draft a {name} (Common Paper) through a friendly chat.
 Ask for the fields one to three at a time, in plain language, grouping related ones. Keep replies short. Fields (all required unless marked optional):
@@ -101,19 +103,30 @@ def _complete(system: str, messages: list[ChatMessage], response_format: type[Ba
     return response_format.model_validate_json(response.choices[0].message.content)
 
 
+def _with_follow_up(reply: str, missing: list[str]) -> str:
+    """Guarantee a question while required fields remain: models sometimes end on a statement."""
+    if missing and not reply.rstrip().endswith("?"):
+        return f"{reply.rstrip()} What is the {missing[0]}?"
+    return reply
+
+
 def _draft_turn(messages: list[ChatMessage], document_id: str, current_fields: dict) -> ChatResponse:
-    context = f"\n\nToday's date: {date.today().isoformat()}\nCurrent field values: {current_fields}"
+    context = f"\n\nToday's date: {date.today().isoformat()}\nCurrent field values: {current_fields}\n\n{FINAL_REMINDER}"
     if document_id == documents.NDA_ID:
         result = _complete(NDA_PROMPT + context, messages, ChatReply)
-        return ChatResponse(reply=result.reply, documentType=document_id, fields=result.fields.model_dump())
-    prompt = GENERIC_PROMPT.format(
-        name=documents.DOCUMENTS[document_id]["name"],
-        fields=documents.fields_text(document_id),
-        rules=TURN_RULES,
-        missing=", ".join(documents.missing_required(document_id, current_fields)) or "none",
-    )
-    result = _complete(prompt + context, messages, documents.reply_model(document_id))
-    return ChatResponse(reply=result.reply, documentType=document_id, fields=result.fields.model_dump(by_alias=True))
+        fields = result.fields.model_dump()
+        missing = documents.nda_missing_required(documents.merge_updates(current_fields, fields))
+    else:
+        prompt = GENERIC_PROMPT.format(
+            name=documents.DOCUMENTS[document_id]["name"],
+            fields=documents.fields_text(document_id),
+            rules=TURN_RULES,
+            missing=", ".join(documents.missing_required(document_id, current_fields)) or "none",
+        )
+        result = _complete(prompt + context, messages, documents.reply_model(document_id))
+        fields = result.fields.model_dump(by_alias=True)
+        missing = documents.missing_required(document_id, documents.merge_updates(current_fields, fields))
+    return ChatResponse(reply=_with_follow_up(result.reply, missing), documentType=document_id, fields=fields)
 
 
 def chat(messages: list[ChatMessage], document_type: str | None, current_fields: dict) -> ChatResponse:

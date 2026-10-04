@@ -34,6 +34,34 @@ def missing_required(document_id: str, values: dict) -> list[str]:
     ]
 
 
+NDA_REQUIRED = ["purpose", "governingLaw", "jurisdiction"]
+NDA_PARTY_REQUIRED = ["company", "name", "title", "notice"]
+
+
+def nda_missing_required(values: dict) -> list[str]:
+    """Required Mutual NDA field labels with no value; party fields are dotted, e.g. party1.company."""
+    parties = [f"{p}.{k}" for p in ("party1", "party2") for k in NDA_PARTY_REQUIRED]
+    missing = []
+    for key in NDA_REQUIRED + parties:
+        value = values
+        for part in key.split("."):
+            value = (value or {}).get(part) if isinstance(value, dict) else None
+        if not str(value or "").strip():
+            missing.append(key)
+    return missing
+
+
+def merge_updates(current: dict, update: dict) -> dict:
+    """Overlay the non-null values of a model update (one nesting level for NDA parties) on current values."""
+    merged = {**current}
+    for key, value in update.items():
+        if isinstance(value, dict):
+            merged[key] = {**(current.get(key) or {}), **{k: v for k, v in value.items() if v}}
+        elif value:
+            merged[key] = value
+    return merged
+
+
 @cache
 def reply_model(document_id: str) -> type[BaseModel]:
     """Structured-output model for a generic document: every spec field is an optional string.

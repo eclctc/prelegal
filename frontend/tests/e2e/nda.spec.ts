@@ -10,7 +10,7 @@ test("no console errors or hydration warnings on load", async ({ page }) => {
   const errors: string[] = [];
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
   await openApp(page);
-  await expect(page.getByRole("heading", { name: "Mutual NDA" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Mutual Non-Disclosure Agreement", level: 1 }).first()).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -150,4 +150,11 @@ test("download and print stay disabled until every required detail is filled", a
   await expect(download).toBeEnabled();
   await expect(print).toBeEnabled();
   await expect(page.getByText(/Still needed/)).toHaveCount(0);
+});
+
+test("focus returns to the message box after the AI replies", async ({ page }) => {
+  await openApp(page, [{ reply: "Noted.", fields: {} }]);
+  await say(page, "hello");
+  await page.getByText("Noted.").waitFor();
+  await expect(page.getByLabel("Message")).toBeFocused();
 });

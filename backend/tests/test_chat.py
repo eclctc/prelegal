@@ -110,7 +110,7 @@ def test_generic_prompt_lists_fields_and_missing_required_ones(monkeypatch, tmp_
     assert "Pilot Period" in system
     assert "still missing before this turn: Provider," in system
     assert "Customer," not in system.split("still missing")[1]
-    assert "MUST end the reply with a question" in system
+    assert "MUST end the reply with a direct question" in system
 
 
 def test_fields_update_covers_exactly_the_nda_form_fields():
@@ -138,3 +138,25 @@ def test_every_catalog_document_has_a_spec_covering_all_template_terms():
         text = (root / "templates" / doc["template"]).read_text()
         terms = {re.sub(r"[\u2019']s$", "", t) for t in re.findall(r'class="\w+_link">([^<]+)<', text)}
         assert terms <= known, (doc["id"], terms - known)
+
+
+def test_reply_without_a_question_gets_one_while_required_fields_are_missing(monkeypatch, tmp_path):
+    content = {"reply": "Got it, governing law is Delaware.", "fields": {"Governing Law": "Delaware"}}
+    body = {"messages": [{"role": "user", "content": "Delaware"}], "documentType": "pilot", "fields": {"Customer": "Globex"}}
+    reply = post_chat(monkeypatch, tmp_path, [content], body).json()["reply"]
+    assert reply == "Got it, governing law is Delaware. What is the Provider?"
+
+
+def test_nda_reply_without_a_question_gets_one_naming_the_first_missing_field(monkeypatch, tmp_path):
+    content = {"reply": "Noted.", "fields": {"purpose": "Evaluating a deal", "party1": {"company": "Acme"}}}
+    body = {"messages": [{"role": "user", "content": "x"}], "documentType": "mutual-nda", "fields": {"governingLaw": "Texas"}}
+    assert post_chat(monkeypatch, tmp_path, [content], body).json()["reply"] == "Noted. What is the jurisdiction?"
+
+
+def test_complete_documents_and_real_questions_are_left_alone(monkeypatch, tmp_path):
+    full = {f["key"]: "x" for f in documents.DOCUMENTS["pilot"]["fields"]}
+    done = post_chat(monkeypatch, tmp_path, [{"reply": "All set.", "fields": {}}], {"messages": [], "documentType": "pilot", "fields": full})
+    assert done.json()["reply"] == "All set."
+    asked = {"reply": "Who is the Customer?", "fields": {}}
+    body = {"messages": [], "documentType": "pilot", "fields": {}}
+    assert post_chat(monkeypatch, tmp_path, [asked], body).json()["reply"] == "Who is the Customer?"
