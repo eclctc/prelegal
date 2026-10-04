@@ -9,20 +9,23 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from app import db, llm
+from app import db, documents, llm
 
 
-def fake_completion(content: dict):
+def fake_completion(*contents: dict):
+    """Return each given LLM payload in turn, one per completion call."""
+    queue = list(contents)
+
     def completion(**_kwargs):
-        message = SimpleNamespace(content=json.dumps(content))
+        message = SimpleNamespace(content=json.dumps(queue.pop(0)))
         return SimpleNamespace(choices=[SimpleNamespace(message=message)])
 
     return completion
 
 
-def post_chat(monkeypatch, tmp_path, llm_content, body):
+def post_chat(monkeypatch, tmp_path, llm_contents, body):
     monkeypatch.setattr(db, "DB_PATH", tmp_path / "test.db")
-    monkeypatch.setattr(llm, "completion", fake_completion(llm_content))
+    monkeypatch.setattr(llm, "completion", fake_completion(*llm_contents))
     from app.main import app
 
     with TestClient(app) as client:
@@ -31,8 +34,8 @@ def post_chat(monkeypatch, tmp_path, llm_content, body):
 
 def test_chat_returns_reply_and_extracted_fields(monkeypatch, tmp_path):
     content = {"reply": "Got it. Who is the second party?", "fields": {"governingLaw": "Delaware"}}
-    body = {"messages": [{"role": "user", "content": "Delaware law please"}], "fields": {}}
-    response = post_chat(monkeypatch, tmp_path, content, body)
+    body = {"messages": [{"role": "user", "content": "Delaware law please"}], "documentType": "mutual-nda", "fields": {}}
+    response = post_chat(monkeypatch, tmp_path, [content], body)
     assert response.status_code == 200
     assert response.json()["reply"] == "Got it. Who is the second party?"
     assert response.json()["fields"]["governingLaw"] == "Delaware"
@@ -50,7 +53,7 @@ def test_chat_passes_history_and_current_fields_to_the_model(monkeypatch, tmp_pa
     monkeypatch.setattr(llm, "completion", spy)
     from app.main import app
 
-    body = {"messages": [{"role": "user", "content": "hello"}], "fields": {"governingLaw": "Texas"}}
+    body = {"messages": [{"role": "user", "content": "hello"}], "documentType": "mutual-nda", "fields": {"governingLaw": "Texas"}}
     with TestClient(app) as client:
         client.post("/api/chat", json=body)
     assert seen["model"] == llm.MODEL
@@ -62,8 +65,52 @@ def test_chat_passes_history_and_current_fields_to_the_model(monkeypatch, tmp_pa
 
 def test_chat_rejects_unknown_role(monkeypatch, tmp_path):
     body = {"messages": [{"role": "system", "content": "x"}], "fields": {}}
-    response = post_chat(monkeypatch, tmp_path, {"reply": "", "fields": {}}, body)
+    response = post_chat(monkeypatch, tmp_path, [], body)
     assert response.status_code == 422
+
+
+def test_chat_rejects_unknown_document_type(monkeypatch, tmp_path):
+    body = {"messages": [], "documentType": "lease", "fields": {}}
+    assert post_chat(monkeypatch, tmp_path, [], body).status_code == 422
+
+
+def test_selection_turn_picks_a_document_then_drafts_in_the_same_call(monkeypatch, tmp_path):
+    pick = {"reply": "A pilot, great.", "documentType": "pilot"}
+    draft = {"reply": "Who is the Customer?", "fields": {"Provider": "Acme Inc"}}
+    body = {"messages": [{"role": "user", "content": "I want to trial my product, I am Acme Inc"}], "fields": {}}
+    data = post_chat(monkeypatch, tmp_path, [pick, draft], body).json()
+    assert data["documentType"] == "pilot"
+    assert data["reply"] == "Who is the Customer?"
+    assert data["fields"]["Provider"] == "Acme Inc"
+    assert data["fields"]["Pilot Period"] is None
+
+
+def test_unsupported_document_keeps_selection_open_and_returns_the_offer(monkeypatch, tmp_path):
+    reply = {"reply": "I cannot draft a lease. Would a Pilot Agreement help?", "documentType": None}
+    body = {"messages": [{"role": "user", "content": "a lease"}], "fields": {}}
+    data = post_chat(monkeypatch, tmp_path, [reply], body).json()
+    assert data == {"reply": reply["reply"], "documentType": None, "fields": {}}
+
+
+def test_generic_prompt_lists_fields_and_missing_required_ones(monkeypatch, tmp_path):
+    seen = {}
+
+    def spy(**kwargs):
+        seen.update(kwargs)
+        return fake_completion({"reply": "Hi", "fields": {}})()
+
+    monkeypatch.setattr(db, "DB_PATH", tmp_path / "test.db")
+    monkeypatch.setattr(llm, "completion", spy)
+    from app.main import app
+
+    body = {"messages": [{"role": "user", "content": "hi"}], "documentType": "pilot", "fields": {"Customer": "Globex"}}
+    with TestClient(app) as client:
+        client.post("/api/chat", json=body)
+    system = seen["messages"][0]["content"]
+    assert "Pilot Period" in system
+    assert "still missing before this turn: Provider," in system
+    assert "Customer," not in system.split("still missing")[1]
+    assert "MUST end the reply with a question" in system
 
 
 def test_fields_update_covers_exactly_the_nda_form_fields():
@@ -78,3 +125,16 @@ def test_fields_update_rejects_out_of_range_years_and_bad_dates():
     for bad in ({"termYears": 0}, {"confidentialityYears": 100}, {"effectiveDate": "March 5"}):
         with pytest.raises(ValidationError):
             llm.FieldsUpdate(**bad)
+
+
+def test_every_catalog_document_has_a_spec_covering_all_template_terms():
+    root = Path(__file__).parents[2]
+    catalog = {Path(c["filename"]).name for c in json.loads((root / "catalog.json").read_text())}
+    assert {d["template"] for d in documents.DOCUMENTS.values()} == catalog - {"Mutual-NDA-coverpage.md"}
+    for doc in documents.DOCUMENTS.values():
+        if doc["id"] == documents.NDA_ID:
+            continue
+        known = {f["key"] for f in doc["fields"]} | {a for f in doc["fields"] for a in f.get("aliases", [])}
+        text = (root / "templates" / doc["template"]).read_text()
+        terms = {re.sub(r"[\u2019']s$", "", t) for t in re.findall(r'class="\w+_link">([^<]+)<', text)}
+        assert terms <= known, (doc["id"], terms - known)
