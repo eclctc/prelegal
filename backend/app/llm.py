@@ -75,7 +75,7 @@ class ChatReply(BaseModel):
 
 class ChatMessage(BaseModel):
     role: Literal["user", "assistant"]
-    content: str
+    content: str = Field(max_length=8000)
 
 
 SelectReply = create_model(

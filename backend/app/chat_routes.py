@@ -3,7 +3,7 @@
 from typing import Literal
 
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app import documents, llm
 from app.auth import CurrentUser
@@ -12,7 +12,7 @@ router = APIRouter(prefix="/api")
 
 
 class ChatRequest(BaseModel):
-    messages: list[llm.ChatMessage]
+    messages: list[llm.ChatMessage] = Field(max_length=200)
     documentType: Literal[tuple(documents.DOCUMENTS)] | None = None
     fields: dict
 

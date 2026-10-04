@@ -52,3 +52,12 @@ def test_users_cannot_see_change_or_delete_each_others_documents(signed_in_clien
 
 def test_unknown_document_type_is_rejected(signed_in_client):
     assert signed_in_client.post("/api/documents", json={**BODY, "documentType": "lease"}).status_code == 422
+
+
+def test_oversized_documents_and_messages_are_rejected(signed_in_client):
+    huge_fields = {"Customer": "x" * 200_000}
+    assert signed_in_client.post("/api/documents", json={**BODY, "fields": huge_fields}).status_code == 422
+    long_message = [{"role": "user", "content": "x" * 8001}]
+    assert signed_in_client.post("/api/documents", json={**BODY, "messages": long_message}).status_code == 422
+    too_many = [{"role": "user", "content": "hi"}] * 201
+    assert signed_in_client.post("/api/chat", json={"messages": too_many, "fields": {}}).status_code == 422

@@ -1,5 +1,6 @@
 """Sign up, sign in, sign out and session enforcement."""
 
+import asyncio
 import sqlite3
 
 from fastapi.testclient import TestClient
@@ -61,3 +62,39 @@ def test_logout_ends_the_session(signed_in_client):
 def test_me_reports_no_user_without_an_error_and_chat_requires_a_session(client):
     assert client.get("/api/auth/me").json() == {"email": None}
     assert client.post("/api/chat", json={"messages": [], "fields": {}}).status_code == 401
+
+
+def test_expired_sessions_are_rejected(signed_in_client):
+    with sqlite3.connect(db.DB_PATH) as connection:
+        connection.execute("UPDATE sessions SET created_at = datetime('now', '-8 days')")
+    assert signed_in_client.get("/api/auth/me").json() == {"email": None}
+    assert signed_in_client.get("/api/documents").status_code == 401
+
+
+def test_a_write_is_committed_before_the_response_is_sent(signed_in_client):
+    """With the default dependency scope the commit ran after the response, so a fast follow-up could miss it."""
+    rows_visible_when_response_sent = []
+    body = b'{"documentType": "pilot", "fields": {}, "messages": []}'
+
+    async def receive():
+        return {"type": "http.request", "body": body, "more_body": False}
+
+    async def send(message):
+        if message["type"] == "http.response.body":
+            with sqlite3.connect(db.DB_PATH) as other_connection:
+                rows_visible_when_response_sent.append(
+                    other_connection.execute("SELECT COUNT(*) FROM saved_documents").fetchone()[0]
+                )
+
+    headers = [
+        (b"content-type", b"application/json"),
+        (b"content-length", str(len(body)).encode()),
+        (b"cookie", f"session={signed_in_client.cookies['session']}".encode()),
+    ]
+    scope = {
+        "type": "http", "asgi": {"version": "3.0"}, "http_version": "1.1", "method": "POST",
+        "path": "/api/documents", "raw_path": b"/api/documents", "query_string": b"",
+        "headers": headers, "server": ("test", 80), "client": ("test", 1), "scheme": "http",
+    }
+    asyncio.run(signed_in_client.app(scope, receive, send))
+    assert rows_visible_when_response_sent == [1]

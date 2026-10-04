@@ -4,7 +4,7 @@ import json
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app import documents
 from app.auth import Connection, CurrentUser
@@ -13,12 +13,20 @@ from app.llm import ChatMessage
 router = APIRouter(prefix="/api/documents")
 
 DocumentType = Literal[tuple(documents.DOCUMENTS)]
+MAX_FIELDS_JSON_CHARS = 100_000
 
 
 class DocumentBody(BaseModel):
     documentType: DocumentType
     fields: dict
     messages: list[ChatMessage] = Field(max_length=500)
+
+    @field_validator("fields")
+    @classmethod
+    def fields_not_huge(cls, fields: dict) -> dict:
+        if len(json.dumps(fields)) > MAX_FIELDS_JSON_CHARS:
+            raise ValueError("fields are too large")
+        return fields
 
 
 def _serialize(row, *, with_messages: bool) -> dict:

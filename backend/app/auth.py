@@ -13,7 +13,9 @@ from app.db import get_connection
 SESSION_COOKIE = "session"
 SESSION_MAX_AGE_SECONDS = 7 * 24 * 3600
 
-Connection = Annotated[sqlite3.Connection, Depends(get_connection)]
+# scope="function" makes the commit in get_connection run before the response is sent, so a client
+# that immediately follows one write with another request always sees the committed data.
+Connection = Annotated[sqlite3.Connection, Depends(get_connection, scope="function")]
 
 
 def hash_password(password: str) -> str:
@@ -49,8 +51,8 @@ def find_user(connection: sqlite3.Connection, session: str | None) -> sqlite3.Ro
         return None
     return connection.execute(
         "SELECT users.id, users.email FROM sessions JOIN users ON users.id = sessions.user_id "
-        "WHERE sessions.token_hash = ?",
-        (_token_hash(session),),
+        "WHERE sessions.token_hash = ? AND sessions.created_at > datetime('now', ?)",
+        (_token_hash(session), f"-{SESSION_MAX_AGE_SECONDS} seconds"),
     ).fetchone()
 
 
