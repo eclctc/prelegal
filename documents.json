@@ -1,0 +1,669 @@
+[
+ {
+  "id": "mutual-nda",
+  "name": "Mutual Non-Disclosure Agreement",
+  "template": "Mutual-NDA.md",
+  "description": "Cover page and Common Paper standard terms for a mutual NDA, where both parties share confidential information.",
+  "fields": []
+ },
+ {
+  "id": "csa",
+  "name": "Cloud Service Agreement",
+  "template": "CSA.md",
+  "description": "Common Paper standard Cloud Service Agreement for providing access to a cloud service.",
+  "fields": [
+   {
+    "key": "Customer",
+    "hint": "Legal name of the customer"
+   },
+   {
+    "key": "Provider",
+    "hint": "Legal name of the provider"
+   },
+   {
+    "key": "Effective Date",
+    "hint": "Date the agreement starts, written out e.g. March 5, 2027"
+   },
+   {
+    "key": "Subscription Period",
+    "hint": "Length of the subscription, e.g. 12 months",
+    "aliases": [
+     "Subscription Periods"
+    ]
+   },
+   {
+    "key": "Order Date",
+    "hint": "Date of the order, written out"
+   },
+   {
+    "key": "Non-Renewal Notice Date",
+    "hint": "How long before renewal either party must give notice not to renew, e.g. 30 days"
+   },
+   {
+    "key": "Technical Support",
+    "hint": "Technical support the provider offers",
+    "optional": true
+   },
+   {
+    "key": "Governing Law",
+    "hint": "State or country whose law governs"
+   },
+   {
+    "key": "Chosen Courts",
+    "hint": "Courts that hear disputes, e.g. state and federal courts in New Castle County, Delaware"
+   },
+   {
+    "key": "General Cap Amount",
+    "hint": "Cap on each party's liability, e.g. fees paid in the prior 12 months"
+   },
+   {
+    "key": "DPA",
+    "hint": "Name of the Data Processing Agreement, if any",
+    "optional": true
+   },
+   {
+    "key": "Provider Covered Claims",
+    "hint": "Claims Provider must indemnify Customer for",
+    "optional": true,
+    "aliases": [
+     "Provider Covered Claim"
+    ]
+   },
+   {
+    "key": "Customer Covered Claims",
+    "hint": "Claims Customer must indemnify Provider for",
+    "optional": true,
+    "aliases": [
+     "Customer Covered Claim"
+    ]
+   }
+  ]
+ },
+ {
+  "id": "sla",
+  "name": "Service Level Agreement",
+  "template": "SLA.md",
+  "description": "Common Paper Service Level Agreement covering uptime targets and support response for a cloud service.",
+  "fields": [
+   {
+    "key": "Customer",
+    "hint": "Legal name of the customer"
+   },
+   {
+    "key": "Provider",
+    "hint": "Legal name of the provider"
+   },
+   {
+    "key": "Subscription Period",
+    "hint": "Length of the subscription, e.g. 12 months",
+    "aliases": [
+     "Subscription Periods"
+    ]
+   },
+   {
+    "key": "Target Uptime",
+    "hint": "e.g. 99.9%"
+   },
+   {
+    "key": "Target Response Time",
+    "hint": "e.g. 4 business hours"
+   },
+   {
+    "key": "Support Channel",
+    "hint": "e.g. email or phone"
+   },
+   {
+    "key": "Uptime Credit",
+    "hint": "Credit if uptime is missed"
+   },
+   {
+    "key": "Response Time Credit",
+    "hint": "Credit if response time is missed"
+   },
+   {
+    "key": "Scheduled Downtime",
+    "hint": "Planned downtime allowed, e.g. 4 hours a month"
+   }
+  ]
+ },
+ {
+  "id": "dpa",
+  "name": "Data Processing Agreement",
+  "template": "DPA.md",
+  "description": "Common Paper Data Processing Agreement governing the processing of personal data between a customer and provider.",
+  "fields": [
+   {
+    "key": "Customer",
+    "hint": "Legal name of the customer"
+   },
+   {
+    "key": "Provider",
+    "hint": "Legal name of the provider"
+   },
+   {
+    "key": "Agreement",
+    "hint": "The main agreement this DPA supplements, e.g. Cloud Service Agreement dated March 1, 2027"
+   },
+   {
+    "key": "Categories of Personal Data",
+    "hint": "e.g. names, email addresses"
+   },
+   {
+    "key": "Categories of Data Subjects",
+    "hint": "e.g. customer employees"
+   },
+   {
+    "key": "Special Category Data",
+    "hint": "Any special category data processed",
+    "optional": true
+   },
+   {
+    "key": "Special Category Data Restrictions or Safeguards",
+    "hint": "Safeguards for special category data",
+    "optional": true
+   },
+   {
+    "key": "Frequency of Transfer",
+    "hint": "e.g. continuous"
+   },
+   {
+    "key": "Nature and Purpose of Processing",
+    "hint": "What the provider does with the data and why"
+   },
+   {
+    "key": "Duration of Processing",
+    "hint": "e.g. the term of the Agreement"
+   },
+   {
+    "key": "Approved Subprocessors",
+    "hint": "Subprocessors the provider may use"
+   },
+   {
+    "key": "Governing Member State",
+    "hint": "EU member state whose law governs"
+   },
+   {
+    "key": "Security Policy",
+    "hint": "Name or link of the provider security policy"
+   },
+   {
+    "key": "Provider Security Contact",
+    "hint": "Email or name for security matters"
+   }
+  ]
+ },
+ {
+  "id": "design-partner",
+  "name": "Design Partner Agreement",
+  "template": "Design-Partner-Agreement.md",
+  "description": "Common Paper standard Design Partner Agreement giving early product access in exchange for feedback.",
+  "fields": [
+   {
+    "key": "Partner",
+    "hint": "Legal name of the design partner"
+   },
+   {
+    "key": "Provider",
+    "hint": "Legal name of the provider"
+   },
+   {
+    "key": "Effective Date",
+    "hint": "Date the agreement starts, written out e.g. March 5, 2027"
+   },
+   {
+    "key": "Program",
+    "hint": "Name of the design partner program or product"
+   },
+   {
+    "key": "Term",
+    "hint": "Length of the program, e.g. 6 months"
+   },
+   {
+    "key": "Fees",
+    "hint": "Fees the partner pays, or None"
+   },
+   {
+    "key": "Notice Address",
+    "hint": "Email or postal address for notices"
+   },
+   {
+    "key": "Governing Law",
+    "hint": "State or country whose law governs"
+   },
+   {
+    "key": "Chosen Courts",
+    "hint": "Courts that hear disputes, e.g. state and federal courts in New Castle County, Delaware"
+   }
+  ]
+ },
+ {
+  "id": "psa",
+  "name": "Professional Services Agreement",
+  "template": "PSA.md",
+  "description": "Common Paper standard Professional Services Agreement for services delivered under statements of work.",
+  "fields": [
+   {
+    "key": "Customer",
+    "hint": "Legal name of the customer"
+   },
+   {
+    "key": "Provider",
+    "hint": "Legal name of the provider"
+   },
+   {
+    "key": "Effective Date",
+    "hint": "Date the agreement starts, written out e.g. March 5, 2027"
+   },
+   {
+    "key": "SOW Term",
+    "hint": "Default length of a statement of work"
+   },
+   {
+    "key": "Deliverables",
+    "hint": "What the provider will deliver",
+    "aliases": [
+     "Deliverable"
+    ]
+   },
+   {
+    "key": "Fees",
+    "hint": "Fees for the services"
+   },
+   {
+    "key": "Payment Period",
+    "hint": "Days to pay an invoice, e.g. 30 days"
+   },
+   {
+    "key": "Time of Assignment",
+    "hint": "When rights in deliverables pass, e.g. on payment"
+   },
+   {
+    "key": "Resubmission Period",
+    "hint": "Time to fix rejected deliverables"
+   },
+   {
+    "key": "Rejection Period",
+    "hint": "Time the customer has to reject a deliverable"
+   },
+   {
+    "key": "Customer Obligations",
+    "hint": "What the customer must provide"
+   },
+   {
+    "key": "Customer Policies",
+    "hint": "Customer policies the provider must follow",
+    "optional": true
+   },
+   {
+    "key": "Insurance Minimums",
+    "hint": "Minimum insurance the provider carries"
+   },
+   {
+    "key": "Security Policy",
+    "hint": "Provider security policy",
+    "optional": true
+   },
+   {
+    "key": "Governing Law",
+    "hint": "State or country whose law governs"
+   },
+   {
+    "key": "Chosen Courts",
+    "hint": "Courts that hear disputes, e.g. state and federal courts in New Castle County, Delaware"
+   },
+   {
+    "key": "General Cap Amount",
+    "hint": "Cap on each party's liability, e.g. fees paid in the prior 12 months"
+   },
+   {
+    "key": "Increased Claims",
+    "hint": "Claims subject to a higher cap, e.g. breach of data security",
+    "optional": true
+   },
+   {
+    "key": "Increased Cap Amount",
+    "hint": "The higher cap that applies to Increased Claims",
+    "optional": true
+   },
+   {
+    "key": "Unlimited Claims",
+    "hint": "Claims with unlimited liability, e.g. breach of confidentiality",
+    "optional": true
+   },
+   {
+    "key": "Provider Covered Claims",
+    "hint": "Claims Provider must indemnify Customer for",
+    "optional": true,
+    "aliases": [
+     "Provider Covered Claim"
+    ]
+   },
+   {
+    "key": "Customer Covered Claims",
+    "hint": "Claims Customer must indemnify Provider for",
+    "optional": true,
+    "aliases": [
+     "Customer Covered Claim"
+    ]
+   },
+   {
+    "key": "Additional Warranties",
+    "hint": "Any extra warranties one party gives",
+    "optional": true
+   },
+   {
+    "key": "DPA",
+    "hint": "Name of the Data Processing Agreement, if any",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "id": "partnership",
+  "name": "Partnership Agreement",
+  "template": "Partnership-Agreement.md",
+  "description": "Common Paper standard Partnership Agreement setting out each party's obligations in a business partnership.",
+  "fields": [
+   {
+    "key": "Company",
+    "hint": "Legal name of the company"
+   },
+   {
+    "key": "Partner",
+    "hint": "Legal name of the partner"
+   },
+   {
+    "key": "Effective Date",
+    "hint": "Date the agreement starts, written out e.g. March 5, 2027"
+   },
+   {
+    "key": "End Date",
+    "hint": "Date the partnership ends"
+   },
+   {
+    "key": "Obligations",
+    "hint": "What each party is responsible for"
+   },
+   {
+    "key": "Territory",
+    "hint": "Where the partnership operates"
+   },
+   {
+    "key": "Payment Schedule",
+    "hint": "When payments are made"
+   },
+   {
+    "key": "Payment Process",
+    "hint": "How payments are made"
+   },
+   {
+    "key": "Brand Guidelines",
+    "hint": "Brand guidelines the partner follows",
+    "optional": true
+   },
+   {
+    "key": "Governing Law",
+    "hint": "State or country whose law governs"
+   },
+   {
+    "key": "Chosen Courts",
+    "hint": "Courts that hear disputes, e.g. state and federal courts in New Castle County, Delaware"
+   },
+   {
+    "key": "General Cap Amount",
+    "hint": "Cap on each party's liability, e.g. fees paid in the prior 12 months"
+   },
+   {
+    "key": "Increased Claims",
+    "hint": "Claims subject to a higher cap, e.g. breach of data security",
+    "optional": true
+   },
+   {
+    "key": "Increased Cap Amount",
+    "hint": "The higher cap that applies to Increased Claims",
+    "optional": true
+   },
+   {
+    "key": "Unlimited Claims",
+    "hint": "Claims with unlimited liability, e.g. breach of confidentiality",
+    "optional": true
+   },
+   {
+    "key": "Company Covered Claims",
+    "hint": "Claims Company must indemnify Partner for",
+    "optional": true,
+    "aliases": [
+     "Company Covered Claim"
+    ]
+   },
+   {
+    "key": "Partner Covered Claims",
+    "hint": "Claims Partner must indemnify Company for",
+    "optional": true,
+    "aliases": [
+     "Partner Covered Claim"
+    ]
+   },
+   {
+    "key": "Additional Warranties",
+    "hint": "Any extra warranties one party gives",
+    "optional": true
+   },
+   {
+    "key": "DPA",
+    "hint": "Name of the Data Processing Agreement, if any",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "id": "baa",
+  "name": "Business Associate Agreement",
+  "template": "BAA.md",
+  "description": "Common Paper standard Business Associate Agreement for handling protected health information under HIPAA.",
+  "fields": [
+   {
+    "key": "Company",
+    "hint": "Legal name of the covered entity"
+   },
+   {
+    "key": "Provider",
+    "hint": "Legal name of the business associate"
+   },
+   {
+    "key": "BAA Effective Date",
+    "hint": "Date the BAA starts, written out"
+   },
+   {
+    "key": "Agreement",
+    "hint": "The main agreement this BAA supplements"
+   },
+   {
+    "key": "Breach Notification Period",
+    "hint": "e.g. 5 business days"
+   },
+   {
+    "key": "Limitations",
+    "hint": "Limits on how the provider may use PHI",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "id": "software-license",
+  "name": "Software License Agreement",
+  "template": "Software-License-Agreement.md",
+  "description": "Common Paper standard Software License Agreement for licensing installed software.",
+  "fields": [
+   {
+    "key": "Customer",
+    "hint": "Legal name of the customer"
+   },
+   {
+    "key": "Provider",
+    "hint": "Legal name of the provider"
+   },
+   {
+    "key": "Effective Date",
+    "hint": "Date the agreement starts, written out e.g. March 5, 2027"
+   },
+   {
+    "key": "Order Date",
+    "hint": "Date of the order, written out"
+   },
+   {
+    "key": "Subscription Period",
+    "hint": "Length of the subscription, e.g. 12 months",
+    "aliases": [
+     "Subscription Periods"
+    ]
+   },
+   {
+    "key": "Non-Renewal Notice Date",
+    "hint": "How long before renewal either party must give notice not to renew"
+   },
+   {
+    "key": "Payment Process",
+    "hint": "How and when the customer pays"
+   },
+   {
+    "key": "Permitted Uses",
+    "hint": "What the customer may use the software for"
+   },
+   {
+    "key": "License Limits",
+    "hint": "Limits such as users or devices"
+   },
+   {
+    "key": "Deletion Procedure",
+    "hint": "How the software is deleted at the end"
+   },
+   {
+    "key": "Warranty Period",
+    "hint": "e.g. 90 days"
+   },
+   {
+    "key": "Governing Law",
+    "hint": "State or country whose law governs"
+   },
+   {
+    "key": "Chosen Courts",
+    "hint": "Courts that hear disputes, e.g. state and federal courts in New Castle County, Delaware"
+   },
+   {
+    "key": "General Cap Amount",
+    "hint": "Cap on each party's liability, e.g. fees paid in the prior 12 months"
+   },
+   {
+    "key": "Increased Claims",
+    "hint": "Claims subject to a higher cap, e.g. breach of data security",
+    "optional": true
+   },
+   {
+    "key": "Increased Cap Amount",
+    "hint": "The higher cap that applies to Increased Claims",
+    "optional": true
+   },
+   {
+    "key": "Unlimited Claims",
+    "hint": "Claims with unlimited liability, e.g. breach of confidentiality",
+    "optional": true
+   },
+   {
+    "key": "Provider Covered Claims",
+    "hint": "Claims Provider must indemnify Customer for",
+    "optional": true,
+    "aliases": [
+     "Provider Covered Claim"
+    ]
+   },
+   {
+    "key": "Customer Covered Claims",
+    "hint": "Claims Customer must indemnify Provider for",
+    "optional": true,
+    "aliases": [
+     "Customer Covered Claim"
+    ]
+   },
+   {
+    "key": "Additional Warranties",
+    "hint": "Any extra warranties one party gives",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "id": "pilot",
+  "name": "Pilot Agreement",
+  "template": "Pilot-Agreement.md",
+  "description": "Common Paper standard Pilot Agreement for a time-limited product evaluation.",
+  "fields": [
+   {
+    "key": "Customer",
+    "hint": "Legal name of the customer"
+   },
+   {
+    "key": "Provider",
+    "hint": "Legal name of the provider"
+   },
+   {
+    "key": "Effective Date",
+    "hint": "Date the agreement starts, written out e.g. March 5, 2027"
+   },
+   {
+    "key": "Pilot Period",
+    "hint": "Length of the pilot, e.g. 60 days"
+   },
+   {
+    "key": "Notice Address",
+    "hint": "Email or postal address for notices"
+   },
+   {
+    "key": "Governing Law",
+    "hint": "State or country whose law governs"
+   },
+   {
+    "key": "Chosen Courts",
+    "hint": "Courts that hear disputes, e.g. state and federal courts in New Castle County, Delaware"
+   },
+   {
+    "key": "General Cap Amount",
+    "hint": "Cap on each party's liability, e.g. fees paid in the prior 12 months"
+   }
+  ]
+ },
+ {
+  "id": "ai-addendum",
+  "name": "AI Addendum",
+  "template": "AI-Addendum.md",
+  "description": "Common Paper standard AI Addendum supplementing an agreement to cover AI services, input and output.",
+  "fields": [
+   {
+    "key": "Customer",
+    "hint": "Legal name of the customer"
+   },
+   {
+    "key": "Provider",
+    "hint": "Legal name of the provider"
+   },
+   {
+    "key": "Training Data",
+    "hint": "Customer data the provider may use to train AI"
+   },
+   {
+    "key": "Training Purposes",
+    "hint": "What the training may be used for"
+   },
+   {
+    "key": "Training Restrictions",
+    "hint": "Restrictions on training",
+    "optional": true
+   },
+   {
+    "key": "Improvement Restrictions",
+    "hint": "Restrictions on improving the AI",
+    "optional": true
+   }
+  ]
+ }
+]
