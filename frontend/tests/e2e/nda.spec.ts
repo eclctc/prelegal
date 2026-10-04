@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
+import { openApp } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
   page.on("pageerror", (e) => { throw e; });
@@ -8,13 +9,13 @@ test.beforeEach(async ({ page }) => {
 test("no console errors or hydration warnings on load", async ({ page }) => {
   const errors: string[] = [];
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
-  await page.goto("/");
+  await openApp(page);
   await expect(page.getByRole("heading", { name: "Mutual NDA" })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
 test("default effective date is the browser's local today", async ({ page }) => {
-  await page.goto("/");
+  await openApp(page);
   const today = await page.evaluate(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -26,14 +27,14 @@ test("effective date uses the viewer's timezone near midnight", async ({ browser
   const ctx = await browser.newContext({ timezoneId: "Pacific/Auckland" });
   const page = await ctx.newPage();
   await page.clock.install({ time: new Date("2026-03-05T11:30:00Z") }); // 00:30 Mar 6 in Auckland
-  await page.goto("/");
+  await openApp(page);
   await expect(page.getByLabel("Effective date", { exact: true })).toHaveValue("2026-03-06");
   await expect(page.getByRole("article")).toContainText("March 6, 2026");
   await ctx.close();
 });
 
 test("fills the form end to end and previews the agreement", async ({ page }) => {
-  await page.goto("/");
+  await openApp(page);
   await page.getByLabel("Governing law").fill("Delaware");
   await page.getByLabel("Jurisdiction").fill("New Castle, DE");
   await page.getByLabel("Modifications").fill("Section 8 is deleted.");
@@ -49,7 +50,7 @@ test("fills the form end to end and previews the agreement", async ({ page }) =>
 });
 
 test("term options change the agreement text", async ({ page }) => {
-  await page.goto("/");
+  await openApp(page);
   const doc = page.getByRole("article");
   await page.getByLabel("MNDA term in years").fill("3");
   await expect(doc).toContainText("expires 3 years after the Effective Date");
@@ -61,7 +62,7 @@ test("term options change the agreement text", async ({ page }) => {
 });
 
 test("arrow keys move between radios in a group", async ({ page }) => {
-  await page.goto("/");
+  await openApp(page);
   const first = page.getByRole("radio", { name: "Expires after a fixed number of years" });
   await first.focus();
   await page.keyboard.press("ArrowDown");
@@ -69,7 +70,7 @@ test("arrow keys move between radios in a group", async ({ page }) => {
 });
 
 test("malicious input renders as plain text", async ({ page }) => {
-  await page.goto("/");
+  await openApp(page);
   await page.getByLabel("Purpose").fill("# Pwned <script>window.__x=1</script> <img src=x onerror=window.__x=1>");
   const doc = page.getByRole("article");
   await expect(doc.getByRole("heading", { name: /Pwned/ })).toHaveCount(0);
@@ -79,7 +80,7 @@ test("malicious input renders as plain text", async ({ page }) => {
 });
 
 test("downloads a Markdown file with the filled-in agreement", async ({ page }) => {
-  await page.goto("/");
+  await openApp(page);
   await page.getByLabel("Governing law").fill("New York");
   const [download] = await Promise.all([
     page.waitForEvent("download"),
@@ -97,7 +98,7 @@ test("downloads a Markdown file with the filled-in agreement", async ({ page }) 
 
 test("print layout hides the form and shows the whole agreement", async ({ page }) => {
   await page.setViewportSize({ width: 1400, height: 700 }); // landscape-sized
-  await page.goto("/");
+  await openApp(page);
   await page.emulateMedia({ media: "print" });
   await expect(page.locator("aside")).toBeHidden();
   await expect(page.getByRole("button", { name: /Download/ })).toBeHidden();
@@ -109,7 +110,7 @@ test("print layout hides the form and shows the whole agreement", async ({ page 
 });
 
 test("PDF export produces a multi-page file", async ({ page }) => {
-  await page.goto("/");
+  await openApp(page);
   const pdf = await page.pdf({ format: "Letter" });
   const pages = pdf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) ?? [];
   expect(pages.length).toBeGreaterThan(2);
@@ -117,7 +118,7 @@ test("PDF export produces a multi-page file", async ({ page }) => {
 
 test("layout works at phone width without horizontal scroll", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 800 });
-  await page.goto("/");
+  await openApp(page);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
   await expect(page.getByLabel("Governing law")).toBeVisible();
@@ -125,7 +126,7 @@ test("layout works at phone width without horizontal scroll", async ({ page }) =
 });
 
 test("numeric inputs keep what the user types", async ({ page }) => {
-  await page.goto("/");
+  await openApp(page);
   const box = page.getByLabel("Confidentiality term in years");
   await box.fill("");
   await box.pressSequentially("5");
