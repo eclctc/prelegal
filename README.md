@@ -8,14 +8,14 @@ A platform for drafting common legal agreements.
 
 ## Run
 
-Requires Docker and a `.env` file in the project root.
+Requires Docker and a `.env` file in the project root containing `OPENROUTER_API_KEY=...` (plain `KEY=value`, no quotes: `docker --env-file` keeps quotes literally).
 
 ```bash
 scripts/start-mac.sh      # or start-linux.sh / start-windows.ps1
 scripts/stop-mac.sh       # or stop-linux.sh / stop-windows.ps1
 ```
 
-The app is served at http://localhost:8000. The sign-in screen is a placeholder: any input is accepted.
+The app is served at http://localhost:8000. The sign-in screen is a placeholder: any input is accepted. After sign-in, an AI assistant chats with you and fills in the Mutual NDA as you talk.
 
 ## Test
 
